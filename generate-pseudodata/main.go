@@ -96,7 +96,7 @@ var SkinType = [...]string{"I", "II", "III", "IV", "V", "VI"}
 var CancerTypes = []string{"Adenocarcinoma", "Osteosarcoma", "Chondrosarcoma", "Glioblastoma", "Astrocytoma", "Pancreatic ductal adenocarcinoma", "Thyroid papillary carcinoma", "Melanoma"}
 
 func main() {
-	count := 5
+	count := 100000
 	var patients []patient
 	for i := 0; i < count; i++ {
 		new_patient := generatePatient()
@@ -118,7 +118,7 @@ func writeJSON(filename string, data interface{}) {
 	defer file.Close()
 
 	encoder := json.NewEncoder(file)
-	encoder.SetIndent("", "  ")
+	encoder.SetIndent("", "")
 	if err := encoder.Encode(data); err != nil {
 		panic(err)
 	}
