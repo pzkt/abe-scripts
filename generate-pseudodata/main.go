@@ -2,8 +2,10 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"math/rand"
 	"os"
+	"strconv"
 	"time"
 
 	fake "github.com/brianvoe/gofakeit/v7"
@@ -96,7 +98,17 @@ var SkinType = [...]string{"I", "II", "III", "IV", "V", "VI"}
 var CancerTypes = []string{"Adenocarcinoma", "Osteosarcoma", "Chondrosarcoma", "Glioblastoma", "Astrocytoma", "Pancreatic ductal adenocarcinoma", "Thyroid papillary carcinoma", "Melanoma"}
 
 func main() {
-	count := 100000
+	if len(os.Args) != 2 {
+		fmt.Println("Incorrect args: provide one argument for the number of generated patient records")
+		return
+	}
+
+	count, err := strconv.Atoi(os.Args[1])
+	if err != nil {
+		fmt.Println("Incorrect args: must be a number")
+		return
+	}
+
 	var patients []patient
 	for i := 0; i < count; i++ {
 		new_patient := generatePatient()
