@@ -1,3 +1,5 @@
+#[cfg(test)]
+mod test {
 use rabe::schemes::bdabe::*;
 use rabe::utils::policy::pest::PolicyLanguage;
 
@@ -14,4 +16,5 @@ fn main(){
     let ct_decrypted = decrypt(&sk, &ct);
     assert_eq!(ct_decrypted.is_ok(), true);
     assert_eq!(ct_decrypted.unwrap(), plaintext);
+}
 }
