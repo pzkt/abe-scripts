@@ -1,4 +1,4 @@
-use criterion::{black_box, criterion_group, BenchmarkId, Criterion, SamplingMode, Throughput};
+use criterion::{criterion_group, BenchmarkId, Criterion, SamplingMode, Throughput};
 
 use rabe::schemes::bsw::*;
 use rabe::utils::policy::pest::PolicyLanguage;

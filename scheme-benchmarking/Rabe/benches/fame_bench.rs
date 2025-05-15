@@ -1,4 +1,4 @@
-use criterion::{black_box, criterion_group, BenchmarkId, Criterion, SamplingMode, Throughput};
+use criterion::{criterion_group, BenchmarkId, Criterion, SamplingMode, Throughput};
 
 use rabe::schemes::ac17::*;
 use rabe::utils::policy::pest::PolicyLanguage;
@@ -27,7 +27,7 @@ pub fn keygen_bench(c: &mut Criterion){
         group.bench_with_input(
             BenchmarkId::from_parameter(a),
             &attr_refs,
-            |b, attr_refs| { b.iter(|| cp_keygen(&msk, black_box(&attr_refs)))});
+            |b, attr_refs| { b.iter(|| cp_keygen(&msk, &attr_refs))});
     }
 }
 

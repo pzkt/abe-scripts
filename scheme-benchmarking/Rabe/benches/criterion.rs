@@ -8,5 +8,6 @@ mod bsw07_bench;
 
 criterion_main! {
     fame_bench::benches,
-    bsw07_bench::benches
+    bsw07_bench::benches,
+    ghw11_bench::benches
 }
