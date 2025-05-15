@@ -1,0 +1,12 @@
+[package]
+name = "abe-benchmarks"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+criterion = "0.5.1"
+rabe = "0.4.2"
+
+[[bench]]
+name = "criterion"
+harness = false
