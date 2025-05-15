@@ -7,5 +7,6 @@ mod mke08_bench;
 mod bsw07_bench;
 
 criterion_main! {
-    fame_bench::benches
+    fame_bench::benches,
+    bsw07_bench::benches
 }

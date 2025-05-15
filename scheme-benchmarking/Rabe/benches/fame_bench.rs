@@ -1,4 +1,4 @@
-use criterion::{black_box, criterion_group, BenchmarkId, Criterion, Throughput};
+use criterion::{black_box, criterion_group, BenchmarkId, Criterion, SamplingMode, Throughput};
 
 use rabe::schemes::ac17::*;
 use rabe::utils::policy::pest::PolicyLanguage;
@@ -18,6 +18,11 @@ pub fn keygen_bench(c: &mut Criterion){
     for &a in ATTR_NR.iter() {
         let attributes: Vec<String> = (0..a).map(|i| format!("attribute_{}", i)).collect();
         let attr_refs: Vec<&str> = attributes.iter().map(|s| s.as_str()).collect();
+
+        //sanity check
+        assert!(cp_keygen(&msk, &attr_refs).is_ok());
+        
+        group.sampling_mode(SamplingMode::Flat);
         group.throughput(Throughput::Elements(a as u64));
         group.bench_with_input(
             BenchmarkId::from_parameter(a),
@@ -40,6 +45,10 @@ pub fn and_encryption_bench(c: &mut Criterion){
             for _ in 1..a { policy.push_str(")"); }
         }
 
+        //sanity check
+        assert!(cp_encrypt(&pk, &policy, &plaintext, PolicyLanguage::HumanPolicy).is_ok());
+
+        group.sampling_mode(SamplingMode::Flat);
         group.throughput(Throughput::Elements(a as u64));
         group.bench_with_input(
             BenchmarkId::from_parameter(a),
@@ -62,6 +71,10 @@ pub fn or_encryption_bench(c: &mut Criterion){
             for _ in 1..a { policy.push_str(")"); }
         }
 
+        //sanity check
+        assert!(cp_encrypt(&pk, &policy, &plaintext, PolicyLanguage::HumanPolicy).is_ok());
+        
+        group.sampling_mode(SamplingMode::Flat);
         group.throughput(Throughput::Elements(a as u64));
         group.bench_with_input(
             BenchmarkId::from_parameter(a),
@@ -91,6 +104,10 @@ pub fn and_decryption_bench(c: &mut Criterion){
 
         let sk = cp_keygen(&msk, &attr_refs).unwrap();
 
+        //sanity check
+        assert!(cp_decrypt(&sk, &ct).is_ok());
+        
+        group.sampling_mode(SamplingMode::Flat);
         group.throughput(Throughput::Elements(a as u64));
         group.bench_with_input(
             BenchmarkId::from_parameter(a),
@@ -114,12 +131,12 @@ pub fn or_decryption_bench(c: &mut Criterion){
         }
 
         let ct = cp_encrypt(&pk, &policy, &plaintext, PolicyLanguage::HumanPolicy).unwrap();
-
-        let attributes: Vec<String> = (0..a).map(|i| format!("attribute_{}", i)).collect();
-        let attr_refs: Vec<&str> = attributes.iter().map(|s| s.as_str()).collect();
-
         let sk = cp_keygen(&msk, &vec![format!("attribute_{}", a-1).as_str()]).unwrap();
 
+        //sanity check
+        assert!(cp_decrypt(&sk, &ct).is_ok());
+        
+        group.sampling_mode(SamplingMode::Flat);
         group.throughput(Throughput::Elements(a as u64));
         group.bench_with_input(
             BenchmarkId::from_parameter(a),
