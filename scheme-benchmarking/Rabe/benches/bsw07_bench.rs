@@ -27,7 +27,29 @@ pub fn keygen_bench(c: &mut Criterion){
         group.bench_with_input(
             BenchmarkId::from_parameter(a),
             &attr_refs,
-            |b, attr_refs| { b.iter(|| keygen(&pk, &msk, black_box(&attr_refs)))});
+            |b, attr_refs| { b.iter(|| keygen(&pk, &msk, &attr_refs))});
+    }
+}
+
+pub fn delegate_bench(c: &mut Criterion){
+    let (pk, msk) = setup();
+
+    let mut group = c.benchmark_group("bsw07_delegate_attributes");
+    for &a in ATTR_NR.iter() {
+        let attributes: Vec<String> = (0..a).map(|i| format!("attribute{}", i)).collect();
+        let attr_refs: Vec<&str> = attributes.iter().map(|s| s.as_str()).collect();
+        let delegated_attr_refs: &[&str] = &attr_refs[0..attr_refs.len()];
+
+        let sk = keygen(&pk, &msk, &attr_refs).unwrap();
+
+        assert!(delegate(&pk, &sk, delegated_attr_refs).is_some());
+
+        group.sampling_mode(SamplingMode::Flat);
+        group.throughput(Throughput::Elements(a as u64));
+        group.bench_with_input(
+            BenchmarkId::from_parameter(a),
+            &delegated_attr_refs,
+            |b, delegated_attr_refs| { b.iter(|| delegate(&pk, &sk, delegated_attr_refs))});
     }
 }
 
@@ -148,5 +170,5 @@ pub fn or_decryption_bench(c: &mut Criterion){
 criterion_group! {
     name = benches;
     config = Criterion::default().sample_size(REPEATS);
-    targets = setup_bench, keygen_bench, and_encryption_bench, or_encryption_bench, and_decryption_bench, or_decryption_bench
+    targets = setup_bench, keygen_bench, delegate_bench, and_encryption_bench, or_encryption_bench, and_decryption_bench, or_decryption_bench
 }
