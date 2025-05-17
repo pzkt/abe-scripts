@@ -9,7 +9,7 @@ def main():
     (master_key, master_public_key) = cpabe.setup()
     msg = group.random(GT)
 
-    repeats = 1
+    repeats = 10
     attribute_counts = [1, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50]
 
     def note(op, attr_nr, time):

@@ -8,7 +8,7 @@ pub const ATTR_NR: [i32; 11] = [1, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50];
 pub const PLAINTEXT: &str = "Blue canary in the outlet by the light switch, who watches over you. Make a little birdhouse in your soul";
 
 pub fn setup_bench(c: &mut Criterion){
-    c.bench_function("fame_setup", |b| b.iter(|| setup()));
+    c.bench_function("ghw11_setup", |b| b.iter(|| setup()));
 }
 
 pub fn keygen_bench(c: &mut Criterion){

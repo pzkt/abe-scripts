@@ -32,7 +32,7 @@ std::string build_attributes(size_t count, const std::string& separator) {
 }
 
 std::string get_msg() {
-    return "wow schgloopy!";
+    return "Blue canary in the outlet by the light switch, who watches over you. Make a little birdhouse in your soul";
 }
 
 static void setup(benchmark::State& state){
