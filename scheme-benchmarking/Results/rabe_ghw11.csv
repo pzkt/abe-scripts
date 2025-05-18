@@ -1,4 +1,4 @@
-attributes,setup,keygen,transform_keygen,and_encrypt,or_encrypt,and_transform,or_transform,and_decrypt,or_decrypt
+attributes,setup,keygen,transform keygen,and encrypt,or encrypt,and transform,or transform,and decrypt,or decrypt
 1,0.012548,0.0061627,0.004623,0.010966,0.011043,0.012371,0.011829,0.0034094,0.0033792
 5,0.012548,0.018644,0.01087,0.017032,0.017132,0.02995,0.011809,0.0035843,0.0033995
 10,0.012548,0.033929,0.018647,0.024579,0.024799,0.05227,0.011853,0.0032875,0.0035701

@@ -1,4 +1,4 @@
-attributes,setup,keygen,delegate,and_encrypt,or_encrypt,and_decrypt,or_decrypt
+attributes,setup,keygen,delegate,and encrypt,or encrypt,and decrypt,or decrypt
 1,0.0092296,0.0064012,0.0065524,0.013052,0.012986,0.012548,0.012541
 5,0.0092296,0.020271,0.026504,0.026942,0.027077,0.0522,0.012505
 10,0.0092296,0.037645,0.051934,0.044723,0.044367,0.10275,0.012601
