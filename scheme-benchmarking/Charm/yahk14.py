@@ -1,5 +1,6 @@
 from charm.toolbox.pairinggroup import PairingGroup,ZR,G1,G2,GT,pair
 from charm.schemes.abenc.abenc_unmcpabe_yahk14 import CPABE_YAHK14
+from charm.adapters.abenc_adapt_hybrid import HybridABEnc
 from charm.core.engine.util import bytesToObject, objectToBytes
 from charm.toolbox.conversion import Conversion
 from hashlib import sha256
@@ -38,15 +39,14 @@ def main():
 
     print("AND cipher size benchmark")
     for size in range(25):
+        hyb_abe = HybridABEnc(cpabe, group)
+        (pk, mk) = hyb_abe.setup()
+        
         content = os.urandom(1<<size)
         for a in attribute_counts:
             access_policy = f"({' and '.join(f'{i}' for i in range(a))})"
-            cipher_text = cpabe.encrypt(master_public_key, msg, access_policy)
-            cipher_bytes = str(cipher_text).encode('utf-8')
-
-            gt_bytes = str(msg).encode('utf-8')
-            aes_cipher = encrypt_aes(sha256(gt_bytes).digest(), str(content))
-            update_csv("charm_yahk14_ct.csv", str(a), "hybrid " + str(1<<size), str(len(pickle.dumps(aes_cipher)) + len(pickle.dumps(cipher_bytes))))
+            ct = str(hyb_abe.encrypt(pk, content, access_policy))
+            update_csv("charm_yahk14_ct.csv", str(a), "hybrid " + str(1<<size), str(len(ct)))
 
     print("setup benchmark")
     timer = (timeit.timeit(setup = "gc.enable()", stmt = setup, number = repeats))/repeats

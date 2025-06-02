@@ -1,5 +1,7 @@
 from charm.toolbox.pairinggroup import PairingGroup,GT
+from charm.core.math.pairing import hashPair as sha2
 from charm.schemes.abenc.abenc_maabe_rw15 import MaabeRW15,merge_dicts
+from charm.adapters.dabenc_adapt_hybrid import HybridABEncMA
 from charm.core.engine.util import bytesToObject, objectToBytes
 from charm.toolbox.conversion import Conversion
 from hashlib import sha256
@@ -47,17 +49,21 @@ def main():
 
     print("AND cipher size benchmark")
     for size in range(25):
+        hyb_abe = HybridABEncMA(maabe, group)
+        gp = hyb_abe.setup()
+        
         content = os.urandom(1<<size)
         for a in attribute_counts:
-            (public_key, secret_key) = maabe.authsetup(public_parameters, "AUTH0")
-            public_keys = {'AUTH0': public_key}
+            (pk, _) = hyb_abe.authsetup(gp, "AUTH0")
+            pks = {'AUTH0': pk}
             access_policy = f"({' and '.join(f'ATTRIBUTE{i}@AUTH0' for i in range(a))})"
-            cipher_text = maabe.encrypt(public_parameters, public_keys, msg, access_policy)
-            cipher_bytes = str(cipher_text).encode('utf-8')
 
-            gt_bytes = str(msg).encode('utf-8')
-            aes_cipher = encrypt_aes(sha256(gt_bytes).digest(), str(content))
-            update_csv("charm_rw15_ct.csv", str(a), "hybrid " + str(1<<size), str(len(pickle.dumps(aes_cipher)) + len(pickle.dumps(cipher_bytes))))
+            c1 = maabe.encrypt(gp, pks, msg, access_policy)
+            cipher = AuthenticatedCryptoAbstraction(sha2(msg))
+            c2 = cipher.encrypt(content)
+            cipher_text = { 'c1':c1, 'c2':c2 }
+
+            update_csv("charm_rw15_ct.csv", str(a), "hybrid " + str(1<<size), str(len(pickle.dumps(str(cipher_text)))))
 
     print("setup benchmark")
     timer = (timeit.timeit(setup = "gc.enable()", stmt = setup, number = repeats))/repeats

@@ -1,10 +1,12 @@
-import csv
-import os
-
 from charm.toolbox.symcrypto import AuthenticatedCryptoAbstraction
 from charm.core.engine.util import bytesToObject, objectToBytes
 from charm.toolbox.conversion import Conversion
+from charm.core.engine.util import objectToBytes
+
+import pickle
 import json
+import csv
+import os
 
 def update_csv(file_name: str, index: str, column: str, value: str):
     records: List[List[str]] = []
@@ -73,3 +75,19 @@ def encrypt_aes(key: bytes, plaintext: str) -> bytes:
     ciphertext = auth_enc.encrypt(plaintext.encode('utf-8'))
 
     return ciphertext
+
+def serialize_ct(ct, group):
+    serializable_ct = {}
+    for key, value in ct.items():
+        if isinstance(value, dict):
+            serializable_ct[key] = {
+                k: group.serialize(v) for k, v in value.items()
+            }
+        elif isinstance(value, list):
+            serializable_ct[key] = [group.serialize(v) for v in value]
+        else:
+            try:
+                serializable_ct[key] = group.serialize(value)
+            except:
+                serializable_ct[key] = value
+    return serializable_ct
