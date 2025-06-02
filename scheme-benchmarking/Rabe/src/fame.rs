@@ -2,14 +2,35 @@
 mod test {
     use rabe::schemes::ac17::*;
     use rabe::utils::policy::pest::PolicyLanguage;
-    
+    use rand::Rng;
+    use bincode;
+    use crate::shared::*;
+
+
+    pub const ATTR_NR: [i32; 11] = [1, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50];
+
     #[test]
     fn main(){
-        let (pk, msk) = setup();
-        let plaintext = String::from("our plaintext!").into_bytes();
-        let policy = String::from(r#""attribute_0""#);
-        let ct: Ac17CpCiphertext =  cp_encrypt(&pk, &policy, &plaintext, PolicyLanguage::HumanPolicy).unwrap();
-        let sk: Ac17CpSecretKey = cp_keygen(&msk, &vec!["attribute_0", "attribute_1", "attribute_2", "attribute_3", "attribute_4", "attribute_5", "attribute_6", "attribute_7", "attribute_8", "attribute_9", "attribute_10", "attribute_11", "attribute_12", "attribute_13", "attribute_14", "attribute_15", "attribute_16", "attribute_17", "attribute_18", "attribute_19"]).unwrap();
-        assert_eq!(cp_decrypt(&sk, &ct).unwrap(), plaintext);
+        let (pk, _) = setup();
+
+        for n in 0..25{
+            let mut content = vec![0u8; 1usize << n];
+            rand::thread_rng().fill(&mut content[..]);
+
+            for &a in ATTR_NR.iter() {
+                let mut policy = r#""attribute0""#.to_owned();
+                if a != 1 {
+                    policy = r#"("attribute0""#.to_owned();
+                    for i in 1..(a-1) { policy.push_str(&format!(r#" or ("attribute{}""#, &i)); }
+                    policy.push_str(&format!(r#" or "attribute{}""#, a-1));
+                    for _ in 1..a { policy.push_str(")"); }
+                }
+            
+                let ct = cp_encrypt(&pk, &policy,  &content, PolicyLanguage::HumanPolicy).unwrap();
+                let serialized_ct = bincode::serialize(&ct).unwrap();
+                // horrible string and &str conversions
+                _ = update_csv("rabe_fame_ct.csv", &a.to_string(), &("single ".to_owned() + &(1usize << n).to_string()), &(serialized_ct.len()).to_string());            
+            }
+        }
     }
 }

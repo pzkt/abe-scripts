@@ -4,7 +4,7 @@ import numpy as np
 import random
 
 path = "../scheme-benchmarking/Results/storage/"
-files = ["charm_bsw07_ct","charm_fame_ct","charm_rw15_ct","charm_waters11_ct","charm_yahk14_ct","circl_tkn20_ct","gofe_fame_ct"]
+files = ["charm_bsw07_ct","charm_fame_ct","charm_rw15_ct","charm_waters11_ct","charm_yahk14_ct","circl_tkn20_ct","gofe_fame_ct","rabe_bsw07_ct","rabe_fame_ct","rabe_ghw11_ct"]
 markers = ["o","s","D","P","^","o","o","o","o","s","D"];
 lib_colors = ["#003a7d"] * 5 + ["#008dff", "#d83034" , "#c701ff"] + ["#4ecb8d"] * 3
 
@@ -14,7 +14,10 @@ for file in files:
         csv_file = pd.read_csv(path + file + ".csv")
         selectRow = csv_file.iloc[0]
         selectRow = selectRow.drop(["index", "attributes"], errors="ignore")
-        selectRow = selectRow[~selectRow.index.str.startswith("single")]
+        if (file not in ["rabe_bsw07_ct", "rabe_fame_ct", "rabe_ghw11_ct"]):
+            selectRow = selectRow[~selectRow.index.str.startswith("single")]
+        selectRow.index = selectRow.index.str.replace(r'^single', '', regex=True)
+        selectRow.index = selectRow.index.str.replace(r'^hybrid', '', regex=True)
         data.append(selectRow)
     except:
         continue
@@ -32,7 +35,6 @@ a = 1  # Starting value
 b = 2  # Growth factor (adjust this to change the slope)
 
 reference_line = a * (b ** x_positions)
-print(reference_line)
 
 # Plot the reference line
 plt.semilogy(data[0].index, reference_line, 'r--', label=f'Exponential growth (factor {b})')
