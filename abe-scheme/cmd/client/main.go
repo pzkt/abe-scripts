@@ -11,9 +11,10 @@ import (
 func main() {
 	db := utils.Connect()
 	fmt.Println("client")
+	db.Close()
 }
 
-func addEntry(table string, id string) {
+func addEntry(table string, id string, entry any) {
 
 }
 

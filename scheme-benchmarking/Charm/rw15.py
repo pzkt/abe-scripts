@@ -1,7 +1,13 @@
 from charm.toolbox.pairinggroup import PairingGroup,GT
 from charm.schemes.abenc.abenc_maabe_rw15 import MaabeRW15,merge_dicts
+from charm.core.engine.util import bytesToObject, objectToBytes
+from charm.toolbox.conversion import Conversion
+from hashlib import sha256
+import pickle
+from shared import *
 
 import timeit
+import sys
 
 def main():
     group = PairingGroup('SS512')
@@ -10,11 +16,13 @@ def main():
     msg = group.random(GT)
     (public_key, secret_key) = maabe.authsetup(public_parameters, "AUTH0")
     gid = "user"
+    key = "Svx7QqFWUqDJ6hOo4dByAGqmXOUNOeGP"
 
     repeats = 10
     attribute_counts = [1, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50]
 
     def note(op, attr_nr, time):
+        update_csv("charm_rw15.csv", str(attr_nr), str(op), str(time))
         print(op, attr_nr, "Attributes: ", time)
 
     def setup():
@@ -36,6 +44,20 @@ def main():
 
     def keymerge():
         merged_dicts = merge_dicts(keys1, keys2)
+
+    print("AND cipher size benchmark")
+    for size in range(25):
+        content = os.urandom(1<<size)
+        for a in attribute_counts:
+            (public_key, secret_key) = maabe.authsetup(public_parameters, "AUTH0")
+            public_keys = {'AUTH0': public_key}
+            access_policy = f"({' and '.join(f'ATTRIBUTE{i}@AUTH0' for i in range(a))})"
+            cipher_text = maabe.encrypt(public_parameters, public_keys, msg, access_policy)
+            cipher_bytes = str(cipher_text).encode('utf-8')
+
+            gt_bytes = str(msg).encode('utf-8')
+            aes_cipher = encrypt_aes(sha256(gt_bytes).digest(), str(content))
+            update_csv("charm_rw15_ct.csv", str(a), "hybrid " + str(1<<size), str(len(pickle.dumps(aes_cipher)) + len(pickle.dumps(cipher_bytes))))
 
     print("setup benchmark")
     timer = (timeit.timeit(setup = "gc.enable()", stmt = setup, number = repeats))/repeats

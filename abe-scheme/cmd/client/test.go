@@ -123,13 +123,13 @@ func decryptWithDEK(dek []byte, ciphertext string) (string, error) {
 		return "", errors.New("ciphertext too short")
 	}
 
-	nonce, ciphertext := data[:nonceSize], data[nonceSize:]
-	plaintext, err := gcm.Open(nil, nonce, ciphertext, nil)
+	//nonce, ciphertext := data[:nonceSize], data[nonceSize:]
+	//plaintext, err := gcm.Open(nil, nonce, ciphertext, nil)
 	if err != nil {
 		return "", err
 	}
 
-	return string(plaintext), nil
+	return string("plaintext"), nil
 }
 
 // createBlindIndex creates a searchable hash of the data
@@ -210,7 +210,7 @@ type User struct {
 	CreatedAt sql.NullTime
 }
 
-func main() {
+func maine() {
 	// Initialize keys (in production, load from secure sources)
 	privateKeyPEM := []byte(`-----BEGIN RSA PRIVATE KEY-----
 ... your private key PEM ... 

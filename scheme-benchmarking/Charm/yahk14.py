@@ -1,7 +1,13 @@
 from charm.toolbox.pairinggroup import PairingGroup,ZR,G1,G2,GT,pair
 from charm.schemes.abenc.abenc_unmcpabe_yahk14 import CPABE_YAHK14
+from charm.core.engine.util import bytesToObject, objectToBytes
+from charm.toolbox.conversion import Conversion
+from hashlib import sha256
+import pickle
+from shared import *
 
 import timeit
+import sys
 
 def main():
     group = PairingGroup('SS512')
@@ -13,6 +19,7 @@ def main():
     attribute_counts = [1, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50]
 
     def note(op, attr_nr, time):
+        update_csv("charm_yahk14.csv", str(attr_nr), str(op), str(time))
         print(op, attr_nr, "Attributes: ", time)
 
     def setup():
@@ -28,6 +35,18 @@ def main():
 
     def decrypt():
         decrypted_msg = cpabe.decrypt(master_public_key, secret_key, cipher_text)
+
+    print("AND cipher size benchmark")
+    for size in range(25):
+        content = os.urandom(1<<size)
+        for a in attribute_counts:
+            access_policy = f"({' and '.join(f'{i}' for i in range(a))})"
+            cipher_text = cpabe.encrypt(master_public_key, msg, access_policy)
+            cipher_bytes = str(cipher_text).encode('utf-8')
+
+            gt_bytes = str(msg).encode('utf-8')
+            aes_cipher = encrypt_aes(sha256(gt_bytes).digest(), str(content))
+            update_csv("charm_yahk14_ct.csv", str(a), "hybrid " + str(1<<size), str(len(pickle.dumps(aes_cipher)) + len(pickle.dumps(cipher_bytes))))
 
     print("setup benchmark")
     timer = (timeit.timeit(setup = "gc.enable()", stmt = setup, number = repeats))/repeats
