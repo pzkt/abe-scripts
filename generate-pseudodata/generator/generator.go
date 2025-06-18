@@ -1,10 +1,8 @@
-package main
+package generator
 
 import (
-	"encoding/json"
 	"fmt"
 	"math/rand"
-	"os"
 	"time"
 
 	fake "github.com/brianvoe/gofakeit/v7"
@@ -98,20 +96,6 @@ var CancerTypes = []string{"Adenocarcinoma", "Osteosarcoma", "Chondrosarcoma", "
 
 func Test() {
 	fmt.Println("test")
-}
-
-func writeJSON(filename string, data interface{}) {
-	file, err := os.Create(filename)
-	if err != nil {
-		panic(err)
-	}
-	defer file.Close()
-
-	encoder := json.NewEncoder(file)
-	encoder.SetIndent("", "")
-	if err := encoder.Encode(data); err != nil {
-		panic(err)
-	}
 }
 
 func GenerateName() Name {
