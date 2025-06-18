@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"math/rand"
 	"os"
-	"strconv"
 	"time"
 
 	fake "github.com/brianvoe/gofakeit/v7"
@@ -96,31 +95,6 @@ type OncologyRecord struct {
 var insuranceProviders = [...]string{"Aetna", "Blue Cross Blue Shield", "Cigna", "Humana", "Medicare", "Medicaid"}
 var SkinType = [...]string{"I", "II", "III", "IV", "V", "VI"}
 var CancerTypes = []string{"Adenocarcinoma", "Osteosarcoma", "Chondrosarcoma", "Glioblastoma", "Astrocytoma", "Pancreatic ductal adenocarcinoma", "Thyroid papillary carcinoma", "Melanoma"}
-
-func main() {
-	if len(os.Args) != 2 {
-		fmt.Println("Incorrect args: provide one argument for the number of generated patient records")
-		return
-	}
-
-	count, err := strconv.Atoi(os.Args[1])
-	if err != nil {
-		fmt.Println("Incorrect args: must be a number")
-		return
-	}
-
-	var patients []Patient
-	for i := 0; i < count; i++ {
-		new_patient := GeneratePatient()
-
-		for j := 0; j < fake.Number(0, 6); j++ {
-			new_patient.Records = append(new_patient.Records, GenerateRandomRecord(new_patient.ID))
-		}
-
-		patients = append(patients, new_patient)
-	}
-	writeJSON("patient_data.json", patients)
-}
 
 func Test() {
 	fmt.Println("test")
