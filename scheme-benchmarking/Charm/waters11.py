@@ -54,26 +54,26 @@ def main():
 
     print("keygen benchmark")
     for a in attribute_counts:
-        attr = [f"ATTRIBUTE{i}" for i in range(a)]
+        attr = [f"attribute_{i}" for i in range(a)]
         timer = (timeit.timeit(setup = "gc.enable()", stmt = keygen, number = repeats))/repeats
         note("keygen", a, timer)
 
     print("AND encrypt benchmark")
     for a in attribute_counts:
-        access_policy = f"({' and '.join(f'ATTRIBUTE{i}' for i in range(a))})"
+        access_policy = f"({' and '.join(f'attribute_{i}' for i in range(a))})"
         timer = (timeit.timeit(setup = "gc.enable()", stmt = encrypt, number = repeats))/repeats
         note("AND encrypt", a, timer)
 
     print("OR encrypt benchmark")
     for a in attribute_counts:
-        access_policy = f"({' or '.join(f'ATTRIBUTE{i}' for i in range(a))})"
+        access_policy = f"({' or '.join(f'attribute_{i}' for i in range(a))})"
         timer = (timeit.timeit(setup = f"gc.enable()", stmt = encrypt, number = repeats))/repeats
         note("OR encrypt", a, timer)
 
     print("AND decrypt benchmark")
     for a in attribute_counts:
-        access_policy = f"({' and '.join(f'ATTRIBUTE{i}' for i in range(a))})"
-        attr = [f"ATTRIBUTE{i}" for i in range(a)]
+        access_policy = f"({' and '.join(f'attribute_{i}' for i in range(a))})"
+        attr = [f"attribute_{i}" for i in range(a)]
         cipher_text = cpabe.encrypt(master_public_key, msg, access_policy)
         secret_key = cpabe.keygen(master_public_key, master_key, attr)
 
@@ -82,8 +82,8 @@ def main():
 
     print("OR decrypt benchmark")
     for a in attribute_counts:
-        access_policy = f"({' or '.join(f'ATTRIBUTE{i}' for i in range(a))})"
-        attr = [f"ATTRIBUTE{a-1}"]
+        access_policy = f"({' or '.join(f'attribute_{i}' for i in range(a))})"
+        attr = [f"attribute_{a-1}"]
         cipher_text = cpabe.encrypt(master_public_key, msg, access_policy)
         secret_key = cpabe.keygen(master_public_key, master_key, attr)
 

@@ -36,6 +36,7 @@ func main() {
 	defer db.Close()
 
 	setup(db)
+	return
 	createTable(db, "cardiology_records", utils.CardiologyRecord{})
 
 	entry := utils.CardiologyRecord{Notes: "test", BloodPressure: 80, HeartRate: 20, StressTestResults: "good", CardiacMedications: "none", EFPercentage: 80}
@@ -65,6 +66,24 @@ func setup(db *sql.DB) {
 		id INT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
 		write_key JSONB,
 		data JSONB,
+		created TIMESTAMP DEFAULT NOW()
+	)`
+
+	utils.Assure(db.Exec(query))
+
+	query = `CREATE TABLE IF NOT EXISTS large_data (
+		id INT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+		write_key TEXT,
+		data TEXT,
+		created TIMESTAMP DEFAULT NOW()
+	)`
+
+	utils.Assure(db.Exec(query))
+
+	query = `CREATE TABLE IF NOT EXISTS many_data (
+		id INT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+		write_key TEXT,
+		data TEXT,
 		created TIMESTAMP DEFAULT NOW()
 	)`
 
