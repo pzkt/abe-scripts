@@ -11,27 +11,27 @@ import (
 	fake "github.com/brianvoe/gofakeit/v7"
 )
 
-type patient struct {
+type Patient struct {
 	ID               string           `json:"id"`
-	Name             name             `json:"name"`
+	Name             Name             `json:"name"`
 	DOB              time.Time        `json:"date_of_birth"`
 	Address          string           `json:"address"`
 	Phone            string           `json:"phone"`
 	Email            string           `json:"email"`
 	Insurance        string           `json:"insurance"`
-	EmergencyContact emergencyContact `json:"emergency_contact"`
+	EmergencyContact EmergencyContact `json:"emergency_contact"`
 	CreatedAt        time.Time        `json:"created_date"`
 	Records          []any            `json:"records"`
 }
 
-type name struct {
+type Name struct {
 	NamePrefix string `json:"name_prefix"`
 	FirstName  string `json:"first_name"`
 	LastName   string `json:"last_name"`
 }
 
-type emergencyContact struct {
-	Name    name   `json:"name"`
+type EmergencyContact struct {
+	Name    Name   `json:"name"`
 	Phone   string `json:"phone"`
 	Email   string `json:"email"`
 	Address string `json:"address"`
@@ -109,17 +109,21 @@ func main() {
 		return
 	}
 
-	var patients []patient
+	var patients []Patient
 	for i := 0; i < count; i++ {
-		new_patient := generatePatient()
+		new_patient := GeneratePatient()
 
 		for j := 0; j < fake.Number(0, 6); j++ {
-			new_patient.Records = append(new_patient.Records, generateRandomRecord(new_patient.ID))
+			new_patient.Records = append(new_patient.Records, GenerateRandomRecord(new_patient.ID))
 		}
 
 		patients = append(patients, new_patient)
 	}
 	writeJSON("patient_data.json", patients)
+}
+
+func Test() {
+	fmt.Println("test")
 }
 
 func writeJSON(filename string, data interface{}) {
@@ -136,59 +140,59 @@ func writeJSON(filename string, data interface{}) {
 	}
 }
 
-func generateName() name {
+func GenerateName() Name {
 	namePrefix := ""
 	if fake.Bool() {
 		namePrefix = fake.NamePrefix()
 	}
 
-	return name{
+	return Name{
 		NamePrefix: namePrefix,
 		FirstName:  fake.FirstName(),
 		LastName:   fake.LastName(),
 	}
 }
 
-func generateEmergencyContact() emergencyContact {
-	return emergencyContact{
-		Name:    generateName(),
+func GenerateEmergencyContact() EmergencyContact {
+	return EmergencyContact{
+		Name:    GenerateName(),
 		Phone:   fake.Phone(),
 		Email:   fake.Email(),
 		Address: fake.Address().Address,
 	}
 }
 
-func generatePatient() patient {
-	return patient{
+func GeneratePatient() Patient {
+	return Patient{
 		ID:               fake.DigitN(8),
-		Name:             generateName(),
+		Name:             GenerateName(),
 		DOB:              fake.Date(),
 		Address:          fake.Address().Address,
 		Phone:            fake.Phone(),
 		Email:            fake.Email(),
 		Insurance:        insuranceProviders[rand.Intn(len(insuranceProviders))],
-		EmergencyContact: generateEmergencyContact(),
+		EmergencyContact: GenerateEmergencyContact(),
 		CreatedAt:        fake.Date(),
 		Records:          []any{},
 	}
 }
 
-func generateRandomRecord(patient_id string) any {
+func GenerateRandomRecord(patient_id string) any {
 	switch fake.Number(0, 4) {
 	case 0:
-		return generateCardiologyRecord(patient_id)
+		return GenerateCardiologyRecord(patient_id)
 	case 1:
-		return generateDermatologyRecord(patient_id)
+		return GenerateDermatologyRecord(patient_id)
 	case 2:
-		return generateHematologyRecord(patient_id)
+		return GenerateHematologyRecord(patient_id)
 	case 3:
-		return generateNeurologyRecord(patient_id)
+		return GenerateNeurologyRecord(patient_id)
 	default:
-		return generateOncologyRecord(patient_id)
+		return GenerateOncologyRecord(patient_id)
 	}
 }
 
-func generateBaseMedicalRecord(patient_id string) BaseMedicalRecord {
+func GenerateBaseMedicalRecord(patient_id string) BaseMedicalRecord {
 	return BaseMedicalRecord{
 		PatientID:  patient_id,
 		ProviderID: fake.DigitN(6),
@@ -197,9 +201,9 @@ func generateBaseMedicalRecord(patient_id string) BaseMedicalRecord {
 	}
 }
 
-func generateCardiologyRecord(patient_id string) CardiologyRecord {
+func GenerateCardiologyRecord(patient_id string) CardiologyRecord {
 	return CardiologyRecord{
-		BaseMedicalRecord:  generateBaseMedicalRecord(patient_id),
+		BaseMedicalRecord:  GenerateBaseMedicalRecord(patient_id),
 		BloodPressure:      fake.Number(100, 200),
 		HeartRate:          fake.Number(30, 200),
 		StressTestResults:  fake.LoremIpsumSentence(fake.Number(2, 15)),
@@ -208,9 +212,9 @@ func generateCardiologyRecord(patient_id string) CardiologyRecord {
 	}
 }
 
-func generateDermatologyRecord(patient_id string) DermatologyRecord {
+func GenerateDermatologyRecord(patient_id string) DermatologyRecord {
 	return DermatologyRecord{
-		BaseMedicalRecord: generateBaseMedicalRecord(patient_id),
+		BaseMedicalRecord: GenerateBaseMedicalRecord(patient_id),
 		SkinType:          SkinType[rand.Intn(len(SkinType))],
 		LesionLocation:    fake.LoremIpsumWord(),
 		LesionDescription: fake.LoremIpsumSentence(fake.Number(2, 15)),
@@ -219,9 +223,9 @@ func generateDermatologyRecord(patient_id string) DermatologyRecord {
 	}
 }
 
-func generateHematologyRecord(patient_id string) HematologyRecord {
+func GenerateHematologyRecord(patient_id string) HematologyRecord {
 	return HematologyRecord{
-		BaseMedicalRecord:   generateBaseMedicalRecord(patient_id),
+		BaseMedicalRecord:   GenerateBaseMedicalRecord(patient_id),
 		Hemoglobin:          fake.Float64Range(10.5, 20.5),
 		Hematocrit:          fake.Number(0, 100),
 		WhiteBloodCellCount: fake.Number(4000, 11000),
@@ -231,9 +235,9 @@ func generateHematologyRecord(patient_id string) HematologyRecord {
 	}
 }
 
-func generateNeurologyRecord(patient_id string) NeurologyRecord {
+func GenerateNeurologyRecord(patient_id string) NeurologyRecord {
 	return NeurologyRecord{
-		BaseMedicalRecord: generateBaseMedicalRecord(patient_id),
+		BaseMedicalRecord: GenerateBaseMedicalRecord(patient_id),
 		MentalStatus:      fake.LoremIpsumSentence(fake.Number(2, 5)),
 		CranialNerves:     fake.LoremIpsumSentence(fake.Number(2, 5)),
 		MotorFunction:     fake.LoremIpsumSentence(fake.Number(2, 5)),
@@ -244,9 +248,9 @@ func generateNeurologyRecord(patient_id string) NeurologyRecord {
 	}
 }
 
-func generateOncologyRecord(patient_id string) OncologyRecord {
+func GenerateOncologyRecord(patient_id string) OncologyRecord {
 	return OncologyRecord{
-		BaseMedicalRecord: generateBaseMedicalRecord(patient_id),
+		BaseMedicalRecord: GenerateBaseMedicalRecord(patient_id),
 		CancerType:        CancerTypes[rand.Intn(len(CancerTypes))],
 		TumorLocation:     fake.LoremIpsumSentence(fake.Number(2, 5)),
 		Biomarkers:        fake.LoremIpsumSentence(fake.Number(2, 5)),
