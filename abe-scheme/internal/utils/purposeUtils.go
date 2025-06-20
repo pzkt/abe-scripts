@@ -1,7 +1,5 @@
 package utils
 
-import "fmt"
-
 type PolicyConfig struct {
 	PurposeTrees []*Tree
 }
@@ -19,17 +17,14 @@ func NewTree(rootValue string) *Tree {
 }
 
 func (p PolicyConfig) ResolvePurpose(purpose string) []string {
-	fmt.Println(purpose)
 	out := []string{}
 	for _, pt := range p.PurposeTrees {
 		node, found := pt.findValue(purpose)
 		if !found {
 			continue
 		}
-		fmt.Println("found")
 		out = append(out, node.getRootPath()...)
 	}
-	fmt.Println(out)
 	return out
 }
 

@@ -13,11 +13,22 @@ import (
 	"github.com/pzkt/abe-scripts/abe-scheme/internal/utils"
 )
 
-//docker run --name postgres-container -e POSTGRES_PASSWORD=pwd -p 5432:5432 -d postgres
+/*
+docker setup commands:
 
-//docker start -a postgres-container
+docker run --name postgres-container -e POSTGRES_PASSWORD=pwd -p 5432:5432 -d postgres
 
-//docker run --name pgadmin -p 15432:80 -e 'PGADMIN_DEFAULT_EMAIL=user@domain.com' -e 'PGADMIN_DEFAULT_PASSWORD=pwd' -d dpage/pgadmin4
+docker start -a postgres-container
+
+docker run --name pgadmin -p 15432:80 -e 'PGADMIN_DEFAULT_EMAIL=user@domain.com' -e 'PGADMIN_DEFAULT_PASSWORD=pwd' -d dpage/pgadmin4
+
+Host name/address: 172.17.0.2
+Port: 5432
+Maintenance database: postgres
+Username: postgres
+Password: pwd
+
+*/
 
 func main() {
 	dbPassword := "pwd"
@@ -36,54 +47,35 @@ func main() {
 	defer db.Close()
 
 	setup(db)
-	return
-	createTable(db, "cardiology_records", utils.CardiologyRecord{})
-
-	entry := utils.CardiologyRecord{Notes: "test", BloodPressure: 80, HeartRate: 20, StressTestResults: "good", CardiacMedications: "none", EFPercentage: 80}
-
-	utils.Try(AddEntry(db, "cardiology_records", entry))
-
-	/*
-		 	product := Product{"Boook", 15.55, true}
-			createTable(db, "product", product)
-
-			pk := insertProduct(db, product)
-
-			var name string
-			query := "SELECT name FROM product WHERE id=$1"
-			err = db.QueryRow(query, pk).Scan(&name)
-			if err != nil {
-				log.Fatal(err)
-			}
-
-			fmt.Printf("Name: %s\n", name)
-	*/
 }
 
 func setup(db *sql.DB) {
 	//create the key-value table for table row relations
 	query := `CREATE TABLE IF NOT EXISTS relations (
 		id INT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-		write_key JSONB,
-		data JSONB,
+		private_write_key BYTEA,
+		public_write_key BYTEA,
+		data BYTEA,
 		created TIMESTAMP DEFAULT NOW()
 	)`
 
 	utils.Assure(db.Exec(query))
 
-	query = `CREATE TABLE IF NOT EXISTS large_data (
+	query = `CREATE TABLE IF NOT EXISTS table_one (
 		id INT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-		write_key TEXT,
-		data TEXT,
+		private_write_key BYTEA,
+		public_write_key BYTEA,
+		data BYTEA,
 		created TIMESTAMP DEFAULT NOW()
 	)`
 
 	utils.Assure(db.Exec(query))
 
-	query = `CREATE TABLE IF NOT EXISTS many_data (
+	query = `CREATE TABLE IF NOT EXISTS table_two (
 		id INT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-		write_key TEXT,
-		data TEXT,
+		private_write_key BYTEA,
+		public_write_key BYTEA,
+		data BYTEA,
 		created TIMESTAMP DEFAULT NOW()
 	)`
 

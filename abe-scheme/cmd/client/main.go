@@ -1,12 +1,17 @@
 package main
 
 import (
+	"crypto/x509"
+	"database/sql"
 	"fmt"
+	"log"
 	"strings"
 
-	"github.com/fentec-project/gofe/abe"
 	_ "github.com/lib/pq"
+	"github.com/pzkt/abe-scripts/abe-scheme/internal/crypto"
 	"github.com/pzkt/abe-scripts/abe-scheme/internal/utils"
+
+	"github.com/pzkt/abe-scripts/generate-pseudodata/generator"
 )
 
 type Ops int
@@ -18,19 +23,43 @@ const (
 	GreaterOrEqual
 )
 
-type LargeData struct {
-	WriteKey string `db:"jsonb"`
-	Data     string `db:"jsonb"`
+type env struct {
+	ABEscheme    *crypto.ABEscheme
+	DB           *sql.DB
+	policyConfig utils.PolicyConfig
 }
 
 func main() {
-	//db := utils.Connect()
-	//defer db.Close()
 
-	curPolicy := updatePolicyConfig()
-	toAttr("(Direct AND Analysis) OR Masked-Research", curPolicy)
+	/* 	key := crypto.GenerateSignatureKey()
+
+	   	test := "this is a message"
+
+	   	signed := crypto.Sign(key, utils.ToBytes(test))
+
+	   	fmt.Println("signed: ", signed)
+	   	fmt.Println("correct: ", crypto.Verify(&key.PublicKey, utils.ToBytes(test), signed))
+	   	return */
+
+	db := utils.Connect()
+	defer db.Close()
+
+	env := setup(db)
+
+	record := generator.GenerateCardiologyRecord("345")
+	fmt.Printf("%+v\n", record)
+
+	env.addEntry("table_one", record, "Phone AND (Analysis OR Purchase AND General-Purpose)", "Admin")
 	//fmt.Println(generateBitAttributes(174897, 18))
+	//out, _ := generateComparison(8, 4, Greater)
+}
 
+func setup(db *sql.DB) *env {
+	return &env{
+		ABEscheme:    crypto.Setup(),
+		DB:           db,
+		policyConfig: updatePolicyConfig(),
+	}
 }
 
 func updatePolicyConfig() utils.PolicyConfig {
@@ -38,15 +67,47 @@ func updatePolicyConfig() utils.PolicyConfig {
 	return utils.ExamplePolicyConfig()
 }
 
-func addEntry(table string, id string, entry any, policy string, purposes string, policyConfig utils.PolicyConfig) {
+func (e *env) addEntry(table string, entry any, readPurposes string, writePurposes string) {
 
+	fullReadPurposes := toAttr(readPurposes, e.policyConfig)
+	fullWritePurposes := toAttr(writePurposes, e.policyConfig)
+
+	/* 	combinedPolicy := []string{}
+	   	for _, str := range []string{fullReadPurposes} {
+	   		if str != "" {
+	   			combinedPolicy = append(combinedPolicy, str)
+	   		}
+	   	}
+
+	   	fullPolicy := strings.Join(combinedPolicy, " AND ") */
+
+	fmt.Println("read policy: " + fullReadPurposes)
+	fmt.Println("write policy: " + fullWritePurposes)
+
+	writeKey := crypto.GenerateSignatureKey()
+
+	dataCipher := e.ABEscheme.Encrypt(utils.ToBytes(entry), fullReadPurposes)
+
+	//custom marshal functions for elliptic curve keys
+	marshaledWriteKey := utils.Assure(x509.MarshalECPrivateKey(writeKey))
+	marshaledPublicWriteKey := utils.Assure(writeKey.PublicKey.ECDH()).Bytes()
+
+	writeKeyCipher := e.ABEscheme.Encrypt(marshaledWriteKey, fullWritePurposes)
+
+	// !!! SQL INJECTION RISK (But that's fine for demonstration purposes) !!!
+	query := fmt.Sprintf(`INSERT INTO %s (private_write_key, public_write_key, data) VALUES ($1, $2, $3)`, table)
+	_, err := e.DB.Exec(
+		query,
+		writeKeyCipher,
+		marshaledPublicWriteKey,
+		dataCipher,
+	)
+	if err != nil {
+		log.Fatalf("Insert failed: %v", err)
+	}
 }
 
-func modifyEntry(table string, id string) {
-
-}
-
-func modifyPolicy(fieldId string) {
+func modifyEntry(table string) {
 
 }
 
@@ -59,10 +120,6 @@ func getRow() {
 }
 
 func getTransformRow() {
-
-}
-
-func encryptFile(path string, pubKey *abe.FAMEPubKey) {
 
 }
 

@@ -41,18 +41,18 @@ const (
 // AST Node
 type Node struct {
 	Type     NodeType
-	Value    []string // Only for identifiers
+	Values   []string // Only for identifiers
 	Children []*Node  // For operators
 }
 
 func (n *Node) String() string {
 	switch n.Type {
 	case NodeAND:
-		return fmt.Sprintf("AND(%v, %v)", n.Children[0], n.Children[1])
+		return fmt.Sprintf("(%v AND %v)", n.Children[0], n.Children[1])
 	case NodeOR:
-		return fmt.Sprintf("OR(%v, %v)", n.Children[0], n.Children[1])
+		return fmt.Sprintf("(%v OR %v)", n.Children[0], n.Children[1])
 	case NodeIdent:
-		return strings.Join(n.Value, " | ")
+		return strings.Join(n.Values, " | ")
 	default:
 		return "UNKNOWN"
 	}
@@ -260,8 +260,8 @@ func (p *Parser) parsePrimary() *Node {
 	switch p.token.Type {
 	case TokenIdent:
 		node := &Node{
-			Type:  NodeIdent,
-			Value: p.pc.ResolvePurpose(p.token.Value),
+			Type:   NodeIdent,
+			Values: p.pc.ResolvePurpose(p.token.Value),
 		}
 		p.nextToken()
 		return node
@@ -280,10 +280,140 @@ func (p *Parser) parsePrimary() *Node {
 	}
 }
 
-func toAttr(purposes string, policyConfig utils.PolicyConfig) {
+func reduce(n *Node) *Node {
+
+	if len(n.Children) == 2 && n.Children[0].Type == NodeIdent && n.Children[1].Type == NodeIdent {
+		switch n.Type {
+		case NodeOR:
+			uniqueMap := make(map[string]struct{})
+			for _, item := range n.Children[0].Values {
+				uniqueMap[item] = struct{}{}
+			}
+			for _, item := range n.Children[1].Values {
+				uniqueMap[item] = struct{}{}
+			}
+			mergedArray := make([]string, 0, len(uniqueMap))
+			for key := range uniqueMap {
+				mergedArray = append(mergedArray, key)
+			}
+
+			n.Type = NodeIdent
+			n.Children = nil
+			n.Values = mergedArray
+		case NodeAND:
+			elementMap := make(map[string]struct{})
+			for _, item := range n.Children[0].Values {
+				elementMap[item] = struct{}{}
+			}
+
+			// Create slices for the results
+			matchingElements := []string{}
+			firstArr := []string{}
+			secondArr := []string{}
+
+			for _, item := range n.Children[1].Values {
+				if _, exists := elementMap[item]; exists {
+					matchingElements = append(matchingElements, item)
+				} else {
+					secondArr = append(secondArr, item)
+				}
+			}
+
+			for _, item := range n.Children[0].Values {
+				if _, exists := elementMap[item]; !exists || !contains(matchingElements, item) {
+					firstArr = append(firstArr, item)
+				}
+			}
+
+			if len(matchingElements) == 0 {
+				return n
+			}
+
+			if len(firstArr) == 0 || len(secondArr) == 0 {
+				n.Type = NodeIdent
+				n.Children = nil
+				if len(firstArr) == 0 {
+					n.Values = append(matchingElements, secondArr...)
+				} else {
+					n.Values = append(matchingElements, firstArr...)
+				}
+				return n
+			}
+
+			leftNode := Node{Type: NodeIdent, Values: matchingElements}
+
+			rlNode := Node{Type: NodeIdent, Values: firstArr}
+			rrNode := Node{Type: NodeIdent, Values: secondArr}
+			rightNode := Node{Type: NodeAND, Children: []*Node{&rlNode, &rrNode}}
+
+			n.Type = NodeOR
+			n.Children = []*Node{&leftNode, &rightNode}
+			n.Values = nil
+		}
+	} else {
+		if len(n.Children) > 0 && n.Children[0].Type != NodeIdent {
+			n.Children[0] = reduce(n.Children[0])
+		}
+		if len(n.Children) > 1 && n.Children[1].Type != NodeIdent {
+			n.Children[1] = reduce(n.Children[1])
+		}
+		//n = reduce(n)
+	}
+	return n
+}
+
+func contains(slice []string, item string) bool {
+	for _, v := range slice {
+		if v == item {
+			return true
+		}
+	}
+	return false
+}
+
+func resolveAllPurposes(n *Node) *Node {
+	switch n.Type {
+	case NodeOR, NodeAND:
+		n.Children[0] = resolveAllPurposes(n.Children[0])
+		n.Children[1] = resolveAllPurposes(n.Children[1])
+	case NodeIdent:
+		return resolvePurposeArray(n.Values)
+	}
+	return n
+}
+
+func resolvePurposeArray(purposes []string) *Node {
+	if len(purposes) == 0 {
+		return nil
+	}
+
+	var root *Node
+	for i, ident := range purposes {
+		current := &Node{
+			Type:   NodeIdent,
+			Values: []string{ident},
+		}
+
+		if i == 0 {
+			root = current
+		} else {
+			root = &Node{
+				Type:     NodeOR,
+				Children: []*Node{root, current},
+			}
+		}
+	}
+
+	return root
+}
+
+func toAttr(purposes string, policyConfig utils.PolicyConfig) string {
 	parser := NewParser(purposes, policyConfig)
 	ast := parser.Parse()
-
-	fmt.Printf("Original expression: %s\n", purposes)
-	fmt.Printf("AST: %v\n", ast)
+	//reduce until no changes
+	for ast.String() != reduce(ast).String() {
+		ast = reduce(ast)
+	}
+	//return the resolved version of Ident Nodes
+	return resolveAllPurposes(ast).String()
 }

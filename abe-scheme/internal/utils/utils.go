@@ -1,7 +1,9 @@
 package utils
 
 import (
+	"bytes"
 	"database/sql"
+	"encoding/gob"
 	"fmt"
 	"log"
 )
@@ -30,4 +32,16 @@ func Connect() *sql.DB {
 	db := Assure(sql.Open("postgres", connection))
 	Try(db.Ping())
 	return db
+}
+
+// turn anything into bytes
+func ToBytes(a any) []byte {
+	var network bytes.Buffer
+	enc := gob.NewEncoder(&network)
+	err := enc.Encode(a)
+	if err != nil {
+		log.Fatal("encode error:", err)
+	}
+
+	return network.Bytes()
 }
