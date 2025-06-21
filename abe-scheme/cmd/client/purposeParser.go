@@ -387,8 +387,20 @@ func resolvePurposeArray(purposes []string) *Node {
 		return nil
 	}
 
+	//remove duplicates
+	seen := make(map[string]bool)
+	result := []string{}
+
+	for _, str := range purposes {
+		if !seen[str] {
+			seen[str] = true
+			result = append(result, str)
+		}
+	}
+
+	//loop over purposes
 	var root *Node
-	for i, ident := range purposes {
+	for i, ident := range result {
 		current := &Node{
 			Type:   NodeIdent,
 			Values: []string{ident},

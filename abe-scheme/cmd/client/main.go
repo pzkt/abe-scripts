@@ -32,11 +32,11 @@ const (
 type env struct {
 	abeScheme    *crypto.ABEscheme
 	policyConfig policyConfig.Config
-	entries      []Entry
+	sigKey       *ecdsa.PrivateKey
+	entries      map[uuid.UUID]Entry
 }
 
 type Entry struct {
-	ID       uuid.UUID
 	Created  time.Time
 	writeKey *ecdsa.PrivateKey
 }
@@ -48,6 +48,7 @@ type Record struct {
 	PublicWriteKey  []byte    `json:"public_write_key"`
 	Data            []byte    `json:"data"`
 	Created         time.Time `json:"created"`
+	Signature       []byte    `json:"signature"`
 }
 
 const databaseURL = "http://localhost:8080"
@@ -56,29 +57,24 @@ const authorityURL = "http://localhost:8081"
 const authorityUUID = "497dcba3-ecbf-4587-a2dd-5eb0665e6880"
 
 func main() {
-	/* db := utils.Connect()
-	defer db.Close() */
-
 	env := setup()
-	//defer env.conn.Close()
-	//defer env.cancel()
 
-	myScheme := crypto.Setup()
-	myScheme.PublicKey = env.policyConfig.Scheme.PublicKey
-
-	cipher := myScheme.Encrypt(utils.ToBytes("wow schgloopy"), "test OR flower")
-
-	newKey := requestNewKey([]string{"test", "wow"})
-
-	fmt.Println(string(myScheme.Decrypt(cipher, newKey)))
-
-	return
+	ABEkey := requestNewKey([]string{"Admin"})
 
 	record := generator.GenerateCardiologyRecord("345")
-	env.addEntry("table_one", record, "Phone AND (Analysis OR Purchase AND General-Purpose)", "Admin")
-	fmt.Printf("%v", env.entries[0].ID)
 
-	fmt.Printf("%+v", env.getEntry("table_one", env.entries[0].ID.String()))
+	addedUUID := env.addEntry("table_one", record, "Profiling OR Marketing", "Admin")
+
+	fmt.Println("first plaintext")
+	ciphertext := env.getEntry("table_one", addedUUID).Data
+	fmt.Println(string(env.abeScheme.Decrypt(ciphertext, ABEkey)))
+
+	record.PatientID = "wow schgloopy"
+	env.modifyEntry("table_one", record, "Profiling OR Marketing", "Admin", addedUUID)
+
+	fmt.Println("second plaintext")
+	ciphertext = env.getEntry("table_one", addedUUID).Data
+	fmt.Println(string(env.abeScheme.Decrypt(ciphertext, ABEkey)))
 
 	//fmt.Println(generateBitAttributes(174897, 18))
 	//out, _ := generateComparison(8, 4, Greater)
@@ -87,7 +83,8 @@ func main() {
 func setup() *env {
 	newEnv := env{
 		abeScheme: crypto.Setup(),
-		entries:   []Entry{},
+		entries:   make(map[uuid.UUID]Entry),
+		sigKey:    crypto.GenerateSignatureKey(),
 	}
 
 	newEnv.updatePolicyConfig()
@@ -95,8 +92,15 @@ func setup() *env {
 }
 
 func (e *env) updatePolicyConfig() {
-	data := e.getEntry("relations", authorityUUID).Data
+	data := e.getEntry("relations", utils.Assure(uuid.Parse(authorityUUID))).Data
 	utils.FromBytes(data, &e.policyConfig)
+
+	//we need to reconnect the parents because serialization forces us to remove cyclical references
+	for _, tree := range e.policyConfig.PurposeTrees {
+		tree.ReconnectParents(nil)
+	}
+
+	e.abeScheme.PublicKey = e.policyConfig.Scheme.PublicKey
 }
 
 func requestNewKey(attributes []string) []byte {
@@ -122,7 +126,13 @@ func requestNewKey(attributes []string) []byte {
 	return key
 }
 
-func (e *env) addEntry(table string, entry any, readPurposes string, writePurposes string) {
+func (e *env) addEntry(table string, entry any, readPurposes string, writePurposes string) uuid.UUID {
+	newUUID := uuid.New()
+	e.modifyEntry(table, entry, readPurposes, writePurposes, newUUID)
+	return newUUID
+}
+
+func (e *env) modifyEntry(table string, entry any, readPurposes string, writePurposes string, newUUID uuid.UUID) {
 
 	fullReadPurposes := toAttr(readPurposes, e.policyConfig)
 	fullWritePurposes := toAttr(writePurposes, e.policyConfig)
@@ -138,7 +148,6 @@ func (e *env) addEntry(table string, entry any, readPurposes string, writePurpos
 	writeKeyCipher := e.abeScheme.Encrypt(marshaledWriteKey, fullWritePurposes)
 
 	createdTime := time.Now()
-	newUUID := uuid.New()
 
 	newRecord := Record{
 		Table:           table,
@@ -156,7 +165,6 @@ func (e *env) addEntry(table string, entry any, readPurposes string, writePurpos
 	var newEntry = Entry{
 		writeKey: writeKey,
 		Created:  createdTime,
-		ID:       newUUID,
 	}
 
 	body := utils.Assure(io.ReadAll(resp.Body))
@@ -165,10 +173,10 @@ func (e *env) addEntry(table string, entry any, readPurposes string, writePurpos
 		log.Fatalf("entry add failed: %s", body)
 	}
 
-	e.entries = append(e.entries, newEntry)
+	e.entries[newUUID] = newEntry
 }
 
-func (e *env) getEntry(table string, recordID string) Record {
+func (e *env) getEntry(table string, recordID uuid.UUID) Record {
 	resp := utils.Assure(http.Get(fmt.Sprintf("%s/entries/%s/%s", databaseURL, table, recordID)))
 	defer resp.Body.Close()
 
@@ -183,15 +191,7 @@ func (e *env) getEntry(table string, recordID string) Record {
 	return record
 }
 
-func modifyEntry(table string) {
-
-}
-
 func getRow() {
-
-}
-
-func getTransformRow() {
 
 }
 

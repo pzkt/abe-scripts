@@ -23,6 +23,7 @@ type Record struct {
 	PublicWriteKey  []byte    `json:"public_write_key"`
 	Data            []byte    `json:"data"`
 	Created         time.Time `json:"created"`
+	Signature       []byte    `json:"signature"`
 }
 
 var scheme *crypto.ABEscheme
@@ -34,8 +35,6 @@ func main() {
 
 	scheme = crypto.Setup()
 	updatePolicyConfig()
-
-	fmt.Printf("%+v\n", scheme.PublicKey)
 
 	r := mux.NewRouter()
 	r.HandleFunc("/get_key", getKey).Methods("GET")
@@ -56,7 +55,7 @@ func updatePolicyConfig() {
 
 	newPolicyConfig := policyConfig.Config{
 		PurposeTrees: utils.ExamplePurposeTrees(),
-		Scheme:       crypto.ABEscheme{Scheme: scheme.Scheme, PublicKey: scheme.PublicKey, SecretKey: scheme.SecretKey},
+		Scheme:       crypto.ABEscheme{PublicKey: scheme.PublicKey},
 	}
 
 	newRecord := Record{

@@ -1,5 +1,7 @@
 package utils
 
+import "strings"
+
 type Tree struct {
 	Parent   *Tree   `json:"-"`
 	Children []*Tree `json:"children"`
@@ -30,6 +32,13 @@ func (t Tree) GetRootPath() []string {
 		return []string{t.Value}
 	}
 	return append(t.Parent.GetRootPath(), t.Value)
+}
+
+func (t *Tree) ReconnectParents(p *Tree) {
+	t.Parent = p
+	for _, c := range t.Children {
+		c.ReconnectParents(t)
+	}
 }
 
 func (t *Tree) AddChild(value string) *Tree {
@@ -63,4 +72,25 @@ func ExamplePurposeTrees() []*Tree {
 	research.AddChild("Masked-Research")
 
 	return []*Tree{firstTree, secondTree}
+}
+
+func (t *Tree) String() string {
+	var builder strings.Builder
+	t.stringHelper(&builder, 0)
+	return builder.String()
+}
+
+func (t *Tree) stringHelper(b *strings.Builder, depth int) {
+	if t == nil {
+		return
+	}
+
+	b.WriteString(strings.Repeat("-", depth))
+	b.WriteString(t.Value)
+	b.WriteByte('\n')
+
+	// Recursively print children
+	for _, child := range t.Children {
+		child.stringHelper(b, depth+1)
+	}
 }

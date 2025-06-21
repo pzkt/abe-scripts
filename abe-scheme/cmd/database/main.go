@@ -37,6 +37,7 @@ type Record struct {
 	PublicWriteKey  []byte    `json:"public_write_key"`
 	Data            []byte    `json:"data"`
 	Created         time.Time `json:"created"`
+	Signature       []byte    `json:"signature"`
 }
 
 var db *sql.DB
@@ -95,6 +96,43 @@ func setup(db *sql.DB) {
 }
 
 func addEntry(w http.ResponseWriter, r *http.Request) {
+	var record Record
+	if err := json.NewDecoder(r.Body).Decode(&record); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	var exists bool
+	existQuery := fmt.Sprintf(`SELECT EXISTS(SELECT 1 FROM %s WHERE id = $1)`, record.Table)
+	utils.Try(db.QueryRow(existQuery, record.ID).Scan(&exists))
+
+	if exists {
+		fmt.Println("it EXISTS")
+	} else {
+		fmt.Printf("creating new entry in table: %s with uuid: %s\n", record.Table, record.ID)
+	}
+
+	query := fmt.Sprintf(
+		`INSERT INTO %s (id, private_write_key, public_write_key, data, created) 
+         VALUES ($1, $2, $3, $4, $5) 
+		 ON CONFLICT (id) DO UPDATE SET
+		 private_write_key = EXCLUDED.private_write_key,
+		 public_write_key = EXCLUDED.public_write_key,
+		 data = EXCLUDED.data,
+		 created = EXCLUDED.created`,
+		record.Table,
+	)
+
+	utils.Assure(db.Exec(query,
+		record.ID,
+		record.PrivateWriteKey,
+		record.PublicWriteKey,
+		record.Data,
+		record.Created,
+	))
+}
+
+func modifyEntry(w http.ResponseWriter, r *http.Request) {
 	var record Record
 	if err := json.NewDecoder(r.Body).Decode(&record); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)

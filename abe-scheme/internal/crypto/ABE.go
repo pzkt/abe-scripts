@@ -48,10 +48,6 @@ func (s *ABEscheme) Encrypt(data []byte, policy string) []byte {
 	msp, _ := abe.BooleanToMSP(policy, false)
 	cipher, _ := s.Scheme.Encrypt(string(data), msp, s.PublicKey)
 
-	bytes := utils.ToBytes(cipher)
-	var newCipher abe.FAMECipher
-	utils.FromBytes(bytes, &newCipher)
-
 	return utils.ToBytes(cipher)
 }
 
@@ -63,6 +59,5 @@ func (s *ABEscheme) Decrypt(ciphertext []byte, secret_key []byte) []byte {
 	utils.FromBytes(secret_key, &key)
 
 	plaintext := utils.Assure(s.Scheme.Decrypt(&cipher, &key, s.PublicKey))
-
 	return utils.ToBytes(plaintext)
 }
