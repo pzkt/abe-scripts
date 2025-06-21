@@ -1,10 +1,14 @@
 package main
 
 import (
-	"context"
+	"bytes"
 	"crypto/ecdsa"
 	"crypto/x509"
+	"encoding/json"
 	"fmt"
+	"io"
+	"log"
+	"net/http"
 	"strings"
 	"time"
 
@@ -12,11 +16,7 @@ import (
 	_ "github.com/lib/pq"
 	"github.com/pzkt/abe-scripts/abe-scheme/internal/crypto"
 	"github.com/pzkt/abe-scripts/abe-scheme/internal/utils"
-	pb "github.com/pzkt/abe-scripts/abe-scheme/proto"
 	"github.com/pzkt/abe-scripts/generate-pseudodata/generator"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
-	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 type Ops int
@@ -32,15 +32,25 @@ type env struct {
 	abeScheme    *crypto.ABEscheme
 	policyConfig utils.PolicyConfig
 	entries      []Entry
-	ctx          context.Context
-	client       pb.RecordServiceClient
 }
 
 type Entry struct {
 	ID       uuid.UUID
-	Created  *timestamppb.Timestamp
+	Created  time.Time
 	writeKey *ecdsa.PrivateKey
 }
+
+type Record struct {
+	Table           string    `json:"table"`
+	ID              string    `json:"id"`
+	PrivateWriteKey []byte    `json:"private_write_key"`
+	PublicWriteKey  []byte    `json:"public_write_key"`
+	Data            []byte    `json:"data"`
+	Created         time.Time `json:"created"`
+}
+
+const databaseURL = "http://localhost:8080"
+const authorityURL = "http://localhost:8081"
 
 func main() {
 	/* db := utils.Connect()
@@ -50,36 +60,58 @@ func main() {
 	//defer env.conn.Close()
 	//defer env.cancel()
 
+	cipher := env.abeScheme.Encrypt(utils.ToBytes("wow schgloopy"), "test AND wow")
+
+	newKey := requestNewKey([]string{"test", "wow"})
+
+	fmt.Printf("%+v\n", env.abeScheme.Decrypt())
+
+	return
+
 	record := generator.GenerateCardiologyRecord("345")
-
 	env.addEntry("table_one", record, "Phone AND (Analysis OR Purchase AND General-Purpose)", "Admin")
-
 	fmt.Printf("%v", env.entries[0].ID)
 
-	utils.Assure(env.getEntry(env.entries[0].ID.String()))
+	fmt.Printf("%+v", env.getEntry("table_one", env.entries[0].ID.String()))
 
 	//fmt.Println(generateBitAttributes(174897, 18))
 	//out, _ := generateComparison(8, 4, Greater)
 }
 
 func setup() *env {
-	conn := utils.Assure(grpc.NewClient("localhost:50051", grpc.WithTransportCredentials(insecure.NewCredentials())))
-
-	client := pb.NewRecordServiceClient(conn)
-	ctx, _ := context.WithTimeout(context.Background(), 3*time.Second)
-
 	return &env{
 		abeScheme:    crypto.Setup(),
 		policyConfig: updatePolicyConfig(),
 		entries:      []Entry{},
-		client:       client,
-		ctx:          ctx,
 	}
 }
 
 func updatePolicyConfig() utils.PolicyConfig {
 	//return example policy for now
 	return utils.ExamplePolicyConfig()
+}
+
+func requestNewKey(attributes []string) []byte {
+	req := utils.Assure(http.NewRequest("GET", authorityURL+"/get_key", nil))
+
+	q := req.URL.Query()
+	for _, attr := range attributes {
+		q.Add("attribute", attr)
+	}
+	req.URL.RawQuery = q.Encode()
+
+	resp := utils.Assure(http.DefaultClient.Do(req))
+	defer resp.Body.Close()
+
+	body := utils.Assure(io.ReadAll(resp.Body))
+
+	if resp.StatusCode != http.StatusOK {
+		log.Fatalf("request new key failed: %s", body)
+	}
+
+	key := []byte{}
+	utils.Try(json.Unmarshal(body, &key))
+	return key
 }
 
 func (e *env) addEntry(table string, entry any, readPurposes string, writePurposes string) {
@@ -97,32 +129,50 @@ func (e *env) addEntry(table string, entry any, readPurposes string, writePurpos
 
 	writeKeyCipher := e.abeScheme.Encrypt(marshaledWriteKey, fullWritePurposes)
 
-	var newEntry Entry
-	newEntry.writeKey = writeKey
+	createdTime := time.Now()
+	newUUID := uuid.New()
 
-	resp := utils.Assure(e.client.AddEntry(e.ctx, &pb.AddEntryRequest{
-		Table:                   table,
-		WriteKeyCipher:          writeKeyCipher,
-		MarshaledPublicWriteKey: marshaledPublicWriteKey,
-		DataCipher:              dataCipher,
-	}))
+	newRecord := Record{
+		Table:           table,
+		ID:              newUUID.String(),
+		PrivateWriteKey: writeKeyCipher,
+		PublicWriteKey:  marshaledPublicWriteKey,
+		Data:            dataCipher,
+		Created:         createdTime,
+	}
 
-	newEntry.Created = resp.GetCreated()
-	newEntry.ID = utils.Assure(uuid.Parse(resp.GetId()))
+	jsonData := utils.Assure(json.Marshal(newRecord))
+	resp := utils.Assure(http.Post(databaseURL+"/entries", "application/json", bytes.NewBuffer(jsonData)))
+	defer resp.Body.Close()
+
+	var newEntry = Entry{
+		writeKey: writeKey,
+		Created:  createdTime,
+		ID:       newUUID,
+	}
+
+	body := utils.Assure(io.ReadAll(resp.Body))
+
+	if resp.StatusCode != http.StatusOK {
+		log.Fatalf("entry add failed: %s", body)
+	}
 
 	e.entries = append(e.entries, newEntry)
 }
 
-func (e *env) getEntry(recordID string) ([]byte, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
+func (e *env) getEntry(table string, recordID string) Record {
+	resp := utils.Assure(http.Get(fmt.Sprintf("%s/entries/%s/%s", databaseURL, table, recordID)))
+	defer resp.Body.Close()
 
-	resp, err := e.client.GetEntry(ctx, &pb.GetEntryRequest{Id: recordID})
-	if err != nil {
-		return nil, fmt.Errorf("RPC failed: %v", err)
+	body := utils.Assure(io.ReadAll(resp.Body))
+
+	if resp.StatusCode != http.StatusOK {
+		log.Fatalf("get entry failed: %s", body)
 	}
 
-	return resp.Data, nil
+	var record Record
+	utils.Try(json.Unmarshal(body, &record))
+	return record
 }
 
 func modifyEntry(table string) {
@@ -135,6 +185,23 @@ func getRow() {
 
 func getTransformRow() {
 
+}
+
+func (e *env) getWriteKey(table string, recordID string) Record {
+	resp := utils.Assure(http.Get(fmt.Sprintf("%s/write_key/%s/%s", databaseURL, table, recordID)))
+	defer resp.Body.Close()
+
+	fmt.Println(fmt.Sprintf("%s/write_key/%s/%s", databaseURL, table, recordID))
+
+	body := utils.Assure(io.ReadAll(resp.Body))
+
+	if resp.StatusCode != http.StatusOK {
+		log.Fatalf("get write key failed: %s", body)
+	}
+
+	var record Record
+	utils.Try(json.Unmarshal(body, &record))
+	return record
 }
 
 func generateBitAttributes(value uint, valueSize int) []string {

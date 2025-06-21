@@ -6,26 +6,31 @@ import (
 )
 
 type ABEscheme struct {
-	scheme    *abe.FAME
+	Scheme    *abe.FAME
 	PublicKey *abe.FAMEPubKey
+	SecretKey *abe.FAMESecKey
 }
 
 func Setup() *ABEscheme {
 	a := abe.NewFAME()
-	pubKey, _, _ := a.GenerateMasterKeys()
+	pubKey, secKey, _ := a.GenerateMasterKeys()
 	return &ABEscheme{
-		scheme:    a,
+		Scheme:    a,
 		PublicKey: pubKey,
+		SecretKey: secKey,
 	}
+}
+
+func (s *ABEscheme) KeyGen(attributes []string) []byte {
+	return utils.ToBytes(utils.Assure(s.Scheme.GenerateAttribKeys(attributes, s.SecretKey)))
 }
 
 func (s *ABEscheme) Encrypt(data []byte, policy string) []byte {
 	msp, _ := abe.BooleanToMSP(policy, false)
-	cipher, _ := s.scheme.Encrypt(string(data), msp, s.PublicKey)
+	cipher, _ := s.Scheme.Encrypt(string(data), msp, s.PublicKey)
 	return utils.ToBytes(cipher)
 }
 
-/* func Decrypt(ciphertext []byte, secret_key []byte) []byte {
-
+func Decrypt(ciphertext []byte, secret_key []byte) []byte {
+	return []byte{}
 }
-*/

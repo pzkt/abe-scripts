@@ -1,21 +1,16 @@
 package main
 
 import (
-	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"log"
-	"net"
+	"net/http"
 	"time"
 
-	"github.com/google/uuid"
+	"github.com/gorilla/mux"
 	_ "github.com/lib/pq"
 	"github.com/pzkt/abe-scripts/abe-scheme/internal/utils"
-	pb "github.com/pzkt/abe-scripts/abe-scheme/proto"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
-	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 /*
@@ -35,41 +30,41 @@ Password: pwd
 
 */
 
-type DatabaseService struct {
-	db *sql.DB
+type Record struct {
+	Table           string    `json:"table"`
+	ID              string    `json:"id"`
+	PrivateWriteKey []byte    `json:"private_write_key"`
+	PublicWriteKey  []byte    `json:"public_write_key"`
+	Data            []byte    `json:"data"`
+	Created         time.Time `json:"created"`
 }
 
-type RecordServiceServer struct {
-	dbService *DatabaseService
-	// forward compatibility
-	pb.UnimplementedRecordServiceServer
-}
+var db *sql.DB
 
 func main() {
 	dbPassword := "pwd"
 	connection := fmt.Sprintf("postgres://postgres:%s@localhost:5432/data?sslmode=disable", dbPassword)
 
-	db := utils.Assure(sql.Open("postgres", connection))
+	db = utils.Assure(sql.Open("postgres", connection))
 	utils.Try(db.Ping())
 
 	defer db.Close()
 
-	dbService := &DatabaseService{db: db}
-
-	lis := utils.Assure(net.Listen("tcp", ":50051"))
-
-	grpcServer := grpc.NewServer()
-	pb.RegisterRecordServiceServer(grpcServer, &RecordServiceServer{dbService: dbService})
-	log.Println("Database running on port :50051")
-	grpcServer.Serve(lis)
-
 	setup(db)
+
+	r := mux.NewRouter()
+	r.HandleFunc("/entries", addEntry).Methods("POST")
+	r.HandleFunc("/entries/{table}/{id}", getEntry).Methods("GET")
+	r.HandleFunc("/write_key/{table}/{id}", getWriteKey).Methods("GET")
+
+	log.Println("database server started on port :8080")
+	log.Fatal(http.ListenAndServe(":8080", r))
 }
 
 func setup(db *sql.DB) {
 	//create the key-value table for table row relations
 	query := `CREATE TABLE IF NOT EXISTS relations (
-		id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+		id UUID,
 		private_write_key BYTEA,
 		public_write_key BYTEA,
 		data BYTEA,
@@ -79,7 +74,7 @@ func setup(db *sql.DB) {
 	utils.Assure(db.Exec(query))
 
 	query = `CREATE TABLE IF NOT EXISTS table_one (
-		id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+		id UUID,
 		private_write_key BYTEA,
 		public_write_key BYTEA,
 		data BYTEA,
@@ -89,7 +84,7 @@ func setup(db *sql.DB) {
 	utils.Assure(db.Exec(query))
 
 	query = `CREATE TABLE IF NOT EXISTS table_two (
-		id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+		id UUID,
 		private_write_key BYTEA,
 		public_write_key BYTEA,
 		data BYTEA,
@@ -99,54 +94,71 @@ func setup(db *sql.DB) {
 	utils.Assure(db.Exec(query))
 }
 
-func (s *RecordServiceServer) AddEntry(ctx context.Context, req *pb.AddEntryRequest) (*pb.AddEntryResponse, error) {
+func addEntry(w http.ResponseWriter, r *http.Request) {
+	var record Record
+	if err := json.NewDecoder(r.Body).Decode(&record); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
 
 	query := fmt.Sprintf(
-		`INSERT INTO %s (private_write_key, public_write_key, data) 
-         VALUES ($1, $2, $3) 
+		`INSERT INTO %s (id, private_write_key, public_write_key, data, created) 
+         VALUES ($1, $2, $3, $4, $5) 
          RETURNING id, created`,
-		req.Table,
+		record.Table,
 	)
 
-	var id uuid.UUID
-	var created time.Time
+	utils.Assure(db.Exec(query,
+		record.ID,
+		record.PrivateWriteKey,
+		record.PublicWriteKey,
+		record.Data,
+		record.Created,
+	))
 
-	err := s.dbService.db.QueryRowContext(ctx, query,
-		req.WriteKeyCipher,
-		req.MarshaledPublicWriteKey,
-		req.DataCipher,
-	).Scan(&id, &created)
-
-	if err != nil {
-		log.Printf("Insert failed: %v", err)
-		return nil, status.Error(codes.Internal, "failed to insert record")
-	}
-
-	return &pb.AddEntryResponse{
-		Id:      id.String(),
-		Created: timestamppb.New(created),
-	}, nil
+	fmt.Printf("new entry added in table: %s with uuid: %s\n", record.Table, record.ID)
 }
 
-func (s *RecordServiceServer) GetEntry(ctx context.Context, req *pb.GetEntryRequest) (*pb.GetEntryResponse, error) {
-	// Convert string UUID to PostgreSQL UUID type
-	rowID, err := uuid.Parse(req.Id)
+func getEntry(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	table := vars["table"]
+	id := vars["id"]
+
+	var record Record
+	query := fmt.Sprintf(`SELECT data, created FROM %s WHERE id = $1`, table)
+	err := db.QueryRow(query, id).Scan(&record.Data, &record.Created)
+
+	if err == sql.ErrNoRows {
+		http.Error(w, "record not found", http.StatusNotFound)
+		return
+	}
 	if err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "invalid UUID format")
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
 
-	var data []byte
-	err = s.dbService.db.QueryRowContext(ctx,
-		`SELECT data FROM table_one WHERE id = $1`,
-		rowID,
-	).Scan(&data)
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(record)
+}
 
+func getWriteKey(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	table := vars["table"]
+	id := vars["id"]
+
+	var record Record
+	query := fmt.Sprintf(`SELECT private_write_key FROM %s WHERE id = $1`, table)
+	err := db.QueryRow(query, id).Scan(&record.PrivateWriteKey)
+
+	if err == sql.ErrNoRows {
+		http.Error(w, "record not found", http.StatusNotFound)
+		return
+	}
 	if err != nil {
-		if err == sql.ErrNoRows {
-			return nil, status.Errorf(codes.NotFound, "record not found")
-		}
-		return nil, status.Errorf(codes.Internal, "database error: %v", err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
 
-	return &pb.GetEntryResponse{Data: data}, nil
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(record)
 }
