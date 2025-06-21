@@ -1,16 +1,21 @@
 package main
 
 import (
+	"context"
 	"database/sql"
-	"errors"
 	"fmt"
 	"log"
-	"reflect"
-	"slices"
-	"strings"
+	"net"
+	"time"
 
+	"github.com/google/uuid"
 	_ "github.com/lib/pq"
 	"github.com/pzkt/abe-scripts/abe-scheme/internal/utils"
+	pb "github.com/pzkt/abe-scripts/abe-scheme/proto"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 /*
@@ -30,21 +35,33 @@ Password: pwd
 
 */
 
+type DatabaseService struct {
+	db *sql.DB
+}
+
+type RecordServiceServer struct {
+	dbService *DatabaseService
+	// forward compatibility
+	pb.UnimplementedRecordServiceServer
+}
+
 func main() {
 	dbPassword := "pwd"
 	connection := fmt.Sprintf("postgres://postgres:%s@localhost:5432/data?sslmode=disable", dbPassword)
 
-	db, err := sql.Open("postgres", connection)
-
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	if err = db.Ping(); err != nil {
-		log.Fatal(err)
-	}
+	db := utils.Assure(sql.Open("postgres", connection))
+	utils.Try(db.Ping())
 
 	defer db.Close()
+
+	dbService := &DatabaseService{db: db}
+
+	lis := utils.Assure(net.Listen("tcp", ":50051"))
+
+	grpcServer := grpc.NewServer()
+	pb.RegisterRecordServiceServer(grpcServer, &RecordServiceServer{dbService: dbService})
+	log.Println("Database running on port :50051")
+	grpcServer.Serve(lis)
 
 	setup(db)
 }
@@ -52,7 +69,7 @@ func main() {
 func setup(db *sql.DB) {
 	//create the key-value table for table row relations
 	query := `CREATE TABLE IF NOT EXISTS relations (
-		id INT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+		id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
 		private_write_key BYTEA,
 		public_write_key BYTEA,
 		data BYTEA,
@@ -62,7 +79,7 @@ func setup(db *sql.DB) {
 	utils.Assure(db.Exec(query))
 
 	query = `CREATE TABLE IF NOT EXISTS table_one (
-		id INT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+		id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
 		private_write_key BYTEA,
 		public_write_key BYTEA,
 		data BYTEA,
@@ -72,7 +89,7 @@ func setup(db *sql.DB) {
 	utils.Assure(db.Exec(query))
 
 	query = `CREATE TABLE IF NOT EXISTS table_two (
-		id INT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+		id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
 		private_write_key BYTEA,
 		public_write_key BYTEA,
 		data BYTEA,
@@ -82,168 +99,54 @@ func setup(db *sql.DB) {
 	utils.Assure(db.Exec(query))
 }
 
-/* func insertProduct(db *sql.DB, product Product) int {
-	query := `INSERT INTO product (name, price, available)
-		VALUES ($1, $2, $3) RETURNING id` //$1 can prevent SQL injection
+func (s *RecordServiceServer) AddEntry(ctx context.Context, req *pb.AddEntryRequest) (*pb.AddEntryResponse, error) {
 
-	var pk int
-	err := db.QueryRow(query, product.Name, product.Price, product.Available).Scan(&pk)
-	if err != nil {
-		log.Fatal(err)
-	}
-	return pk
-} */
-
-func createTable(db *sql.DB, tableName string, model any) error {
-	// Get the type of the model
-	t := reflect.TypeOf(model)
-	if t.Kind() == reflect.Ptr {
-		t = t.Elem()
-	}
-	if t.Kind() != reflect.Struct {
-		return fmt.Errorf("model must be a struct or pointer to struct")
-	}
-
-	var columns []string
-	columns = append(columns, "id INT GENERATED ALWAYS AS IDENTITY PRIMARY KEY")
-
-	// Iterate through the struct fields
-	for i := 0; i < t.NumField(); i++ {
-		field := t.Field(i)
-		columnName := strings.ToLower(field.Name)
-
-		if slices.Contains([]string{"id"}, columnName) {
-			return fmt.Errorf("reserved column name used")
-		}
-
-		columnType := ""
-
-		// Map Go types to PostgreSQL types
-		switch field.Type.Kind() {
-		case reflect.String:
-			columnType = "TEXT"
-		case reflect.Int, reflect.Int32:
-			columnType = "INTEGER"
-		case reflect.Int64:
-			columnType = "BIGINT"
-		case reflect.Float32:
-			columnType = "REAL"
-		case reflect.Float64:
-			columnType = "DOUBLE PRECISION"
-		case reflect.Bool:
-			columnType = "BOOLEAN"
-		case reflect.Struct:
-			if field.Type.String() == "time.Time" {
-				columnType = "TIMESTAMP"
-			}
-		default:
-			// Skip unsupported types
-			continue
-		}
-
-		columns = append(columns, fmt.Sprintf("%s %s", columnName, columnType))
-	}
-
-	if len(columns) == 0 {
-		return fmt.Errorf("no valid columns found in struct")
-	}
-
-	query := fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s (\n\t%s\n);", tableName, strings.Join(columns, ",\n\t"))
-
-	_, err := db.Exec(query)
-	return err
-}
-
-func AddEntry(db *sql.DB, tableName string, data any) error {
-	dataType := reflect.TypeOf(data)
-	dataValue := reflect.ValueOf(data)
-
-	if dataType.Kind() == reflect.Ptr {
-		dataType = dataType.Elem()
-		dataValue = dataValue.Elem()
-	}
-
-	if dataType.Kind() != reflect.Struct {
-		return fmt.Errorf("model must be a struct or pointer to struct")
-	}
-
-	columns, err := getTableColumns(db, tableName)
-	if err != nil {
-		return fmt.Errorf("failed to get table columns: %v", err)
-	}
-
-	// Prepare data for insertion
-	var fieldNames []string
-	var placeholders []string
-	var values []interface{}
-	fieldCount := 0
-
-	// Iterate through struct fields
-	for i := 0; i < dataType.NumField(); i++ {
-		field := dataType.Field(i)
-		fieldValue := dataValue.Field(i)
-
-		// Get column name from struct tag or field name
-		columnName := strings.ToLower(field.Name)
-		if tag := field.Tag.Get("db"); tag != "" {
-			columnName = tag
-		}
-
-		// Skip if column doesn't exist in table
-		if !slices.Contains(columns, columnName) {
-			continue
-		}
-
-		fieldNames = append(fieldNames, columnName)
-		placeholders = append(placeholders, fmt.Sprintf("$%d", fieldCount+1))
-		values = append(values, fieldValue.Interface())
-		fieldCount++
-	}
-
-	if len(fieldNames) == 0 {
-		return errors.New("no matching fields found between struct and table")
-	}
-
-	if len(fieldNames) != len(columns)-1 {
-		return errors.New("not all fields in struct could be linked to columns")
-	}
-
-	// Build the SQL query
 	query := fmt.Sprintf(
-		"INSERT INTO %s (%s) VALUES (%s)",
-		tableName,
-		strings.Join(fieldNames, ", "),
-		strings.Join(placeholders, ", "),
+		`INSERT INTO %s (private_write_key, public_write_key, data) 
+         VALUES ($1, $2, $3) 
+         RETURNING id, created`,
+		req.Table,
 	)
 
-	fmt.Println("inserting new data")
-	_, err = db.Exec(query, values...)
-	return err
+	var id uuid.UUID
+	var created time.Time
+
+	err := s.dbService.db.QueryRowContext(ctx, query,
+		req.WriteKeyCipher,
+		req.MarshaledPublicWriteKey,
+		req.DataCipher,
+	).Scan(&id, &created)
+
+	if err != nil {
+		log.Printf("Insert failed: %v", err)
+		return nil, status.Error(codes.Internal, "failed to insert record")
+	}
+
+	return &pb.AddEntryResponse{
+		Id:      id.String(),
+		Created: timestamppb.New(created),
+	}, nil
 }
 
-func getTableColumns(db *sql.DB, tableName string) ([]string, error) {
-	query := `
-		SELECT column_name 
-		FROM information_schema.columns 
-		WHERE table_name = $1
-	`
+func (s *RecordServiceServer) GetEntry(ctx context.Context, req *pb.GetEntryRequest) (*pb.GetEntryResponse, error) {
+	// Convert string UUID to PostgreSQL UUID type
+	rowID, err := uuid.Parse(req.Id)
+	if err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "invalid UUID format")
+	}
 
-	rows := utils.Assure(db.Query(query, tableName))
+	var data []byte
+	err = s.dbService.db.QueryRowContext(ctx,
+		`SELECT data FROM table_one WHERE id = $1`,
+		rowID,
+	).Scan(&data)
 
-	defer rows.Close()
-
-	var columns []string
-	for rows.Next() {
-		var column string
-		if err := rows.Scan(&column); err != nil {
-			return nil, err
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, status.Errorf(codes.NotFound, "record not found")
 		}
-		columns = append(columns, column)
+		return nil, status.Errorf(codes.Internal, "database error: %v", err)
 	}
 
-	if len(columns) == 0 {
-		return nil, fmt.Errorf("table '%s' not found or has no columns", tableName)
-	}
-
-	return columns, nil
+	return &pb.GetEntryResponse{Data: data}, nil
 }

@@ -117,9 +117,7 @@ func (e *env) getEntry(recordID string) ([]byte, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	resp, err := e.client.GetEntry(ctx, &pb.GetEntryRequest{
-		Id: recordID,
-	})
+	resp, err := e.client.GetEntry(ctx, &pb.GetEntryRequest{Id: recordID})
 	if err != nil {
 		return nil, fmt.Errorf("RPC failed: %v", err)
 	}
