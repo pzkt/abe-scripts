@@ -41,16 +41,6 @@ type Entry struct {
 	writeKey *ecdsa.PrivateKey
 }
 
-type Record struct {
-	Table           string    `json:"table"`
-	ID              string    `json:"id"`
-	PrivateWriteKey []byte    `json:"private_write_key"`
-	PublicWriteKey  []byte    `json:"public_write_key"`
-	Data            []byte    `json:"data"`
-	Created         time.Time `json:"created"`
-	Signature       []byte    `json:"signature"`
-}
-
 const databaseURL = "http://localhost:8080"
 const authorityURL = "http://localhost:8081"
 
@@ -149,7 +139,7 @@ func (e *env) modifyEntry(table string, entry any, readPurposes string, writePur
 
 	createdTime := time.Now()
 
-	newRecord := Record{
+	newRecord := utils.Record{
 		Table:           table,
 		ID:              newUUID.String(),
 		PrivateWriteKey: writeKeyCipher,
@@ -176,7 +166,7 @@ func (e *env) modifyEntry(table string, entry any, readPurposes string, writePur
 	e.entries[newUUID] = newEntry
 }
 
-func (e *env) getEntry(table string, recordID uuid.UUID) Record {
+func (e *env) getEntry(table string, recordID uuid.UUID) utils.Record {
 	resp := utils.Assure(http.Get(fmt.Sprintf("%s/entries/%s/%s", databaseURL, table, recordID)))
 	defer resp.Body.Close()
 
@@ -186,7 +176,7 @@ func (e *env) getEntry(table string, recordID uuid.UUID) Record {
 		log.Fatalf("get entry failed: %s", body)
 	}
 
-	var record Record
+	var record utils.Record
 	utils.Try(json.Unmarshal(body, &record))
 	return record
 }
@@ -195,7 +185,7 @@ func getRow() {
 
 }
 
-func (e *env) getWriteKey(table string, recordID string) Record {
+func (e *env) getWriteKey(table string, recordID string) utils.Record {
 	resp := utils.Assure(http.Get(fmt.Sprintf("%s/write_key/%s/%s", databaseURL, table, recordID)))
 	defer resp.Body.Close()
 
@@ -207,7 +197,7 @@ func (e *env) getWriteKey(table string, recordID string) Record {
 		log.Fatalf("get write key failed: %s", body)
 	}
 
-	var record Record
+	var record utils.Record
 	utils.Try(json.Unmarshal(body, &record))
 	return record
 }

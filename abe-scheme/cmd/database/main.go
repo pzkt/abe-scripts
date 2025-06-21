@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"time"
 
 	"github.com/gorilla/mux"
 	_ "github.com/lib/pq"
@@ -29,16 +28,6 @@ Username: postgres
 Password: pwd
 
 */
-
-type Record struct {
-	Table           string    `json:"table"`
-	ID              string    `json:"id"`
-	PrivateWriteKey []byte    `json:"private_write_key"`
-	PublicWriteKey  []byte    `json:"public_write_key"`
-	Data            []byte    `json:"data"`
-	Created         time.Time `json:"created"`
-	Signature       []byte    `json:"signature"`
-}
 
 var db *sql.DB
 
@@ -96,7 +85,7 @@ func setup(db *sql.DB) {
 }
 
 func addEntry(w http.ResponseWriter, r *http.Request) {
-	var record Record
+	var record utils.Record
 	if err := json.NewDecoder(r.Body).Decode(&record); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -133,7 +122,7 @@ func addEntry(w http.ResponseWriter, r *http.Request) {
 }
 
 func modifyEntry(w http.ResponseWriter, r *http.Request) {
-	var record Record
+	var record utils.Record
 	if err := json.NewDecoder(r.Body).Decode(&record); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -166,7 +155,7 @@ func getEntry(w http.ResponseWriter, r *http.Request) {
 	table := vars["table"]
 	id := vars["id"]
 
-	var record Record
+	var record utils.Record
 	query := fmt.Sprintf(`SELECT data, created FROM %s WHERE id = $1`, table)
 	err := db.QueryRow(query, id).Scan(&record.Data, &record.Created)
 
@@ -188,7 +177,7 @@ func getWriteKey(w http.ResponseWriter, r *http.Request) {
 	table := vars["table"]
 	id := vars["id"]
 
-	var record Record
+	var record utils.Record
 	query := fmt.Sprintf(`SELECT private_write_key FROM %s WHERE id = $1`, table)
 	err := db.QueryRow(query, id).Scan(&record.PrivateWriteKey)
 

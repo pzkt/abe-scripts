@@ -5,7 +5,19 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"time"
 )
+
+// generic struct for transmitting information between different parties
+type Record struct {
+	Table           string    `json:"table"`
+	ID              string    `json:"id"`
+	PrivateWriteKey []byte    `json:"private_write_key"`
+	PublicWriteKey  []byte    `json:"public_write_key"`
+	Data            []byte    `json:"data"`
+	Created         time.Time `json:"created"`
+	Signature       []byte    `json:"signature"`
+}
 
 // try will exit if the function returned an error
 func Try(err error) {

@@ -16,16 +16,6 @@ import (
 	"github.com/pzkt/abe-scripts/abe-scheme/internal/utils/policyConfig"
 )
 
-type Record struct {
-	Table           string    `json:"table"`
-	ID              string    `json:"id"`
-	PrivateWriteKey []byte    `json:"private_write_key"`
-	PublicWriteKey  []byte    `json:"public_write_key"`
-	Data            []byte    `json:"data"`
-	Created         time.Time `json:"created"`
-	Signature       []byte    `json:"signature"`
-}
-
 var scheme *crypto.ABEscheme
 
 const databaseURL = "http://localhost:8080"
@@ -58,7 +48,7 @@ func updatePolicyConfig() {
 		Scheme:       crypto.ABEscheme{PublicKey: scheme.PublicKey},
 	}
 
-	newRecord := Record{
+	newRecord := utils.Record{
 		Table:           "relations",
 		ID:              authorityUUID,
 		PrivateWriteKey: []byte{},
