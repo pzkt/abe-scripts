@@ -1,17 +1,22 @@
 package main
 
 import (
+	"context"
+	"crypto/ecdsa"
 	"crypto/x509"
-	"database/sql"
 	"fmt"
-	"log"
 	"strings"
+	"time"
 
+	"github.com/google/uuid"
 	_ "github.com/lib/pq"
 	"github.com/pzkt/abe-scripts/abe-scheme/internal/crypto"
 	"github.com/pzkt/abe-scripts/abe-scheme/internal/utils"
-
+	pb "github.com/pzkt/abe-scripts/abe-scheme/proto"
 	"github.com/pzkt/abe-scripts/generate-pseudodata/generator"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 type Ops int
@@ -24,41 +29,51 @@ const (
 )
 
 type env struct {
-	ABEscheme    *crypto.ABEscheme
-	DB           *sql.DB
+	abeScheme    *crypto.ABEscheme
 	policyConfig utils.PolicyConfig
+	entries      []Entry
+	ctx          context.Context
+	client       pb.RecordServiceClient
+}
+
+type Entry struct {
+	ID       uuid.UUID
+	Created  *timestamppb.Timestamp
+	writeKey *ecdsa.PrivateKey
 }
 
 func main() {
+	/* db := utils.Connect()
+	defer db.Close() */
 
-	/* 	key := crypto.GenerateSignatureKey()
-
-	   	test := "this is a message"
-
-	   	signed := crypto.Sign(key, utils.ToBytes(test))
-
-	   	fmt.Println("signed: ", signed)
-	   	fmt.Println("correct: ", crypto.Verify(&key.PublicKey, utils.ToBytes(test), signed))
-	   	return */
-
-	db := utils.Connect()
-	defer db.Close()
-
-	env := setup(db)
+	env := setup()
+	//defer env.conn.Close()
+	//defer env.cancel()
 
 	record := generator.GenerateCardiologyRecord("345")
-	fmt.Printf("%+v\n", record)
 
 	env.addEntry("table_one", record, "Phone AND (Analysis OR Purchase AND General-Purpose)", "Admin")
+
+	fmt.Printf("%v", env.entries[0].ID)
+
+	utils.Assure(env.getEntry(env.entries[0].ID.String()))
+
 	//fmt.Println(generateBitAttributes(174897, 18))
 	//out, _ := generateComparison(8, 4, Greater)
 }
 
-func setup(db *sql.DB) *env {
+func setup() *env {
+	conn := utils.Assure(grpc.NewClient("localhost:50051", grpc.WithTransportCredentials(insecure.NewCredentials())))
+
+	client := pb.NewRecordServiceClient(conn)
+	ctx, _ := context.WithTimeout(context.Background(), 3*time.Second)
+
 	return &env{
-		ABEscheme:    crypto.Setup(),
-		DB:           db,
+		abeScheme:    crypto.Setup(),
 		policyConfig: updatePolicyConfig(),
+		entries:      []Entry{},
+		client:       client,
+		ctx:          ctx,
 	}
 }
 
@@ -72,46 +87,47 @@ func (e *env) addEntry(table string, entry any, readPurposes string, writePurpos
 	fullReadPurposes := toAttr(readPurposes, e.policyConfig)
 	fullWritePurposes := toAttr(writePurposes, e.policyConfig)
 
-	/* 	combinedPolicy := []string{}
-	   	for _, str := range []string{fullReadPurposes} {
-	   		if str != "" {
-	   			combinedPolicy = append(combinedPolicy, str)
-	   		}
-	   	}
-
-	   	fullPolicy := strings.Join(combinedPolicy, " AND ") */
-
-	fmt.Println("read policy: " + fullReadPurposes)
-	fmt.Println("write policy: " + fullWritePurposes)
-
 	writeKey := crypto.GenerateSignatureKey()
 
-	dataCipher := e.ABEscheme.Encrypt(utils.ToBytes(entry), fullReadPurposes)
+	dataCipher := e.abeScheme.Encrypt(utils.ToBytes(entry), fullReadPurposes)
 
 	//custom marshal functions for elliptic curve keys
 	marshaledWriteKey := utils.Assure(x509.MarshalECPrivateKey(writeKey))
 	marshaledPublicWriteKey := utils.Assure(writeKey.PublicKey.ECDH()).Bytes()
 
-	writeKeyCipher := e.ABEscheme.Encrypt(marshaledWriteKey, fullWritePurposes)
+	writeKeyCipher := e.abeScheme.Encrypt(marshaledWriteKey, fullWritePurposes)
 
-	// !!! SQL INJECTION RISK (But that's fine for demonstration purposes) !!!
-	query := fmt.Sprintf(`INSERT INTO %s (private_write_key, public_write_key, data) VALUES ($1, $2, $3)`, table)
-	_, err := e.DB.Exec(
-		query,
-		writeKeyCipher,
-		marshaledPublicWriteKey,
-		dataCipher,
-	)
+	var newEntry Entry
+	newEntry.writeKey = writeKey
+
+	resp := utils.Assure(e.client.AddEntry(e.ctx, &pb.AddEntryRequest{
+		Table:                   table,
+		WriteKeyCipher:          writeKeyCipher,
+		MarshaledPublicWriteKey: marshaledPublicWriteKey,
+		DataCipher:              dataCipher,
+	}))
+
+	newEntry.Created = resp.GetCreated()
+	newEntry.ID = utils.Assure(uuid.Parse(resp.GetId()))
+
+	e.entries = append(e.entries, newEntry)
+}
+
+func (e *env) getEntry(recordID string) ([]byte, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	resp, err := e.client.GetEntry(ctx, &pb.GetEntryRequest{
+		Id: recordID,
+	})
 	if err != nil {
-		log.Fatalf("Insert failed: %v", err)
+		return nil, fmt.Errorf("RPC failed: %v", err)
 	}
+
+	return resp.Data, nil
 }
 
 func modifyEntry(table string) {
-
-}
-
-func getEntry() {
 
 }
 
