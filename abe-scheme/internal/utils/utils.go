@@ -1,9 +1,8 @@
 package utils
 
 import (
-	"bytes"
 	"database/sql"
-	"encoding/gob"
+	"encoding/json"
 	"fmt"
 	"log"
 )
@@ -36,12 +35,10 @@ func Connect() *sql.DB {
 
 // turn anything into bytes
 func ToBytes(a any) []byte {
-	var network bytes.Buffer
-	enc := gob.NewEncoder(&network)
-	err := enc.Encode(a)
-	if err != nil {
-		log.Fatal("encode error:", err)
-	}
+	return Assure(json.Marshal(a))
+}
 
-	return network.Bytes()
+// turn the bytes from ToBytes back to a struct (pass the struct as a pointer)
+func FromBytes(data []byte, target any) {
+	Try(json.Unmarshal(data, target))
 }

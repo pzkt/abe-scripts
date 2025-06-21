@@ -16,6 +16,7 @@ import (
 	_ "github.com/lib/pq"
 	"github.com/pzkt/abe-scripts/abe-scheme/internal/crypto"
 	"github.com/pzkt/abe-scripts/abe-scheme/internal/utils"
+	"github.com/pzkt/abe-scripts/abe-scheme/internal/utils/policyConfig"
 	"github.com/pzkt/abe-scripts/generate-pseudodata/generator"
 )
 
@@ -30,7 +31,7 @@ const (
 
 type env struct {
 	abeScheme    *crypto.ABEscheme
-	policyConfig utils.PolicyConfig
+	policyConfig policyConfig.Config
 	entries      []Entry
 }
 
@@ -52,6 +53,8 @@ type Record struct {
 const databaseURL = "http://localhost:8080"
 const authorityURL = "http://localhost:8081"
 
+const authorityUUID = "497dcba3-ecbf-4587-a2dd-5eb0665e6880"
+
 func main() {
 	/* db := utils.Connect()
 	defer db.Close() */
@@ -60,11 +63,14 @@ func main() {
 	//defer env.conn.Close()
 	//defer env.cancel()
 
-	cipher := env.abeScheme.Encrypt(utils.ToBytes("wow schgloopy"), "test AND wow")
+	myScheme := crypto.Setup()
+	myScheme.PublicKey = env.policyConfig.Scheme.PublicKey
+
+	cipher := myScheme.Encrypt(utils.ToBytes("wow schgloopy"), "test OR flower")
 
 	newKey := requestNewKey([]string{"test", "wow"})
 
-	fmt.Printf("%+v\n", env.abeScheme.Decrypt())
+	fmt.Println(string(myScheme.Decrypt(cipher, newKey)))
 
 	return
 
@@ -79,16 +85,18 @@ func main() {
 }
 
 func setup() *env {
-	return &env{
-		abeScheme:    crypto.Setup(),
-		policyConfig: updatePolicyConfig(),
-		entries:      []Entry{},
+	newEnv := env{
+		abeScheme: crypto.Setup(),
+		entries:   []Entry{},
 	}
+
+	newEnv.updatePolicyConfig()
+	return &newEnv
 }
 
-func updatePolicyConfig() utils.PolicyConfig {
-	//return example policy for now
-	return utils.ExamplePolicyConfig()
+func (e *env) updatePolicyConfig() {
+	data := e.getEntry("relations", authorityUUID).Data
+	utils.FromBytes(data, &e.policyConfig)
 }
 
 func requestNewKey(attributes []string) []byte {

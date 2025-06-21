@@ -6,7 +6,7 @@ import (
 	"unicode"
 	"unicode/utf8"
 
-	"github.com/pzkt/abe-scripts/abe-scheme/internal/utils"
+	"github.com/pzkt/abe-scripts/abe-scheme/internal/utils/policyConfig"
 )
 
 // Token types
@@ -184,14 +184,14 @@ func lexIdent(l *Lexer) stateFn {
 }
 
 type Parser struct {
-	pc     utils.PolicyConfig
+	pc     policyConfig.Config
 	lexer  *Lexer
 	token  Token
 	peek   Token
 	errors []string
 }
 
-func NewParser(input string, pc utils.PolicyConfig) *Parser {
+func NewParser(input string, pc policyConfig.Config) *Parser {
 	p := &Parser{
 		lexer: NewLexer(input),
 	}
@@ -407,7 +407,7 @@ func resolvePurposeArray(purposes []string) *Node {
 	return root
 }
 
-func toAttr(purposes string, policyConfig utils.PolicyConfig) string {
+func toAttr(purposes string, policyConfig policyConfig.Config) string {
 	parser := NewParser(purposes, policyConfig)
 	ast := parser.Parse()
 	//reduce until no changes

@@ -1,13 +1,9 @@
 package utils
 
-type PolicyConfig struct {
-	PurposeTrees []*Tree
-}
-
 type Tree struct {
-	Parent   *Tree
-	Children []*Tree
-	Value    string
+	Parent   *Tree   `json:"-"`
+	Children []*Tree `json:"children"`
+	Value    string  `json:"value"`
 }
 
 func NewTree(rootValue string) *Tree {
@@ -16,24 +12,12 @@ func NewTree(rootValue string) *Tree {
 	return t
 }
 
-func (p PolicyConfig) ResolvePurpose(purpose string) []string {
-	out := []string{}
-	for _, pt := range p.PurposeTrees {
-		node, found := pt.findValue(purpose)
-		if !found {
-			continue
-		}
-		out = append(out, node.getRootPath()...)
-	}
-	return out
-}
-
-func (t Tree) findValue(value string) (Tree, bool) {
+func (t Tree) FindValue(value string) (Tree, bool) {
 	if t.Value == value {
 		return t, true
 	}
 	for _, ct := range t.Children {
-		node, found := ct.findValue(value)
+		node, found := ct.FindValue(value)
 		if found {
 			return node, true
 		}
@@ -41,11 +25,11 @@ func (t Tree) findValue(value string) (Tree, bool) {
 	return t, false
 }
 
-func (t Tree) getRootPath() []string {
+func (t Tree) GetRootPath() []string {
 	if t.Parent == nil {
 		return []string{t.Value}
 	}
-	return append(t.Parent.getRootPath(), t.Value)
+	return append(t.Parent.GetRootPath(), t.Value)
 }
 
 func (t *Tree) AddChild(value string) *Tree {
@@ -56,7 +40,7 @@ func (t *Tree) AddChild(value string) *Tree {
 	return child
 }
 
-func ExamplePolicyConfig() PolicyConfig {
+func ExamplePurposeTrees() []*Tree {
 	firstTree := NewTree("General-Purpose")
 	firstTree.AddChild("Purchase")
 	firstTree.AddChild("Shipping")
@@ -78,5 +62,5 @@ func ExamplePolicyConfig() PolicyConfig {
 	research.AddChild("Anonymized-Research")
 	research.AddChild("Masked-Research")
 
-	return PolicyConfig{PurposeTrees: []*Tree{firstTree, secondTree}}
+	return []*Tree{firstTree, secondTree}
 }

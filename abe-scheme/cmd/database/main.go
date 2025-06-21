@@ -104,7 +104,11 @@ func addEntry(w http.ResponseWriter, r *http.Request) {
 	query := fmt.Sprintf(
 		`INSERT INTO %s (id, private_write_key, public_write_key, data, created) 
          VALUES ($1, $2, $3, $4, $5) 
-         RETURNING id, created`,
+		 ON CONFLICT (id) DO UPDATE SET
+		 private_write_key = EXCLUDED.private_write_key,
+		 public_write_key = EXCLUDED.public_write_key,
+		 data = EXCLUDED.data,
+		 created = EXCLUDED.created`,
 		record.Table,
 	)
 

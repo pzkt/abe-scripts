@@ -2,15 +2,9 @@ module github.com/pzkt/abe-scripts/abe-scheme
 
 go 1.23.4
 
-require (
-	github.com/fentec-project/gofe v0.0.0-20220829150550-ccc7482d20ef
-	google.golang.org/protobuf v1.36.6
-)
+require github.com/fentec-project/gofe v0.0.0-20220829150550-ccc7482d20ef
 
-require (
-	github.com/brianvoe/gofakeit/v7 v7.2.1 // indirect
-	github.com/google/go-cmp v0.7.0 // indirect
-)
+require github.com/brianvoe/gofakeit/v7 v7.2.1 // indirect
 
 require (
 	github.com/fentec-project/bn256 v0.0.0-20190726093940-0d0fc8bfeed0 // indirect
