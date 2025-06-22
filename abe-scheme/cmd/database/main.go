@@ -115,24 +115,13 @@ func addEntry(w http.ResponseWriter, r *http.Request) {
 
 		fmt.Println("test")
 
-		curve := elliptic.P256()
-		unmarshaledX, unmarshaledY := elliptic.Unmarshal(curve, oldRecord.PublicWriteKey)
-		if unmarshaledX == nil {
-			fmt.Println("Error unmarshaling public key: Invalid point")
-			return
-		}
-
-		publicKey := &ecdsa.PublicKey{
-			Curve: curve, // The curve must be the same as the original
-			X:     unmarshaledX,
-			Y:     unmarshaledY,
-		}
-
-		publicKey := ecdsa.New
+		var publicKey ecdsa.PublicKey
+		utils.FromBytes(record.PublicWriteKey, &publicKey)
+		publicKey.Curve = elliptic.P256()
 
 		fmt.Println("test")
 
-		valid := crypto.Verify(publicKey, checkSum.Bytes(), record.Signature)
+		valid := crypto.Verify(&publicKey, checkSum.Bytes(), record.Signature)
 
 		fmt.Println("test")
 		if !valid {

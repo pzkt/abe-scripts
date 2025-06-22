@@ -32,7 +32,6 @@ const (
 type env struct {
 	abeScheme    *crypto.ABEscheme
 	policyConfig policyConfig.Config
-	sigKey       *ecdsa.PrivateKey
 	entries      map[uuid.UUID]Entry
 }
 
@@ -47,6 +46,24 @@ const authorityURL = "http://localhost:8081"
 const authorityUUID = "497dcba3-ecbf-4587-a2dd-5eb0665e6880"
 
 func main() {
+	/* 	key := crypto.GenerateSignatureKey()
+	   	publicKey := key.PublicKey
+
+	   	publicKey.Curve = nil
+	   	byteKey := utils.ToBytes(publicKey)
+
+	   	var newKey ecdsa.PublicKey
+	   	utils.FromBytes(byteKey, &newKey)
+
+	   	data := []byte{45, 213, 43, 6, 43, 3}
+
+	   	signature := crypto.Sign(key, data)
+
+	   	newKey.Curve = elliptic.P256()
+	   	fmt.Println(crypto.Verify(&newKey, data, signature))
+
+	   	return */
+
 	env := setup()
 
 	ABEkey := requestNewKey([]string{"Admin"})
@@ -74,7 +91,6 @@ func setup() *env {
 	newEnv := env{
 		abeScheme: crypto.Setup(),
 		entries:   make(map[uuid.UUID]Entry),
-		sigKey:    crypto.GenerateSignatureKey(),
 	}
 
 	newEnv.updatePolicyConfig()
@@ -133,7 +149,11 @@ func (e *env) modifyEntry(table string, entry any, readPurposes string, writePur
 
 	//custom marshal functions for elliptic curve keys
 	marshaledWriteKey := utils.Assure(x509.MarshalECPrivateKey(writeKey))
-	marshaledPublicWriteKey := utils.Assure(writeKey.PublicKey.ECDH()).Bytes()
+	publicKey := writeKey.PublicKey
+
+	//curve is an interface type and can't be marshaled, we remove it and the database can add it back
+	publicKey.Curve = nil
+	marshaledPublicWriteKey := utils.ToBytes(publicKey)
 
 	writeKeyCipher := e.abeScheme.Encrypt(marshaledWriteKey, fullWritePurposes)
 
@@ -145,6 +165,8 @@ func (e *env) modifyEntry(table string, entry any, readPurposes string, writePur
 		checkSum.Write(s)
 	}
 
+	signature := crypto.Sign(writeKey, checkSum.Bytes())
+
 	newRecord := utils.Record{
 		Table:           table,
 		ID:              newUUID,
@@ -152,7 +174,7 @@ func (e *env) modifyEntry(table string, entry any, readPurposes string, writePur
 		PublicWriteKey:  marshaledPublicWriteKey,
 		Data:            dataCipher,
 		Created:         createdTime,
-		Signature:       crypto.Sign(e.sigKey, checkSum.Bytes()),
+		Signature:       signature,
 	}
 
 	jsonData := utils.Assure(json.Marshal(newRecord))
