@@ -6,12 +6,14 @@ import (
 	"fmt"
 	"log"
 	"time"
+
+	"github.com/google/uuid"
 )
 
 // generic struct for transmitting information between different parties
 type Record struct {
 	Table           string    `json:"table"`
-	ID              string    `json:"id"`
+	ID              uuid.UUID `json:"id"`
 	PrivateWriteKey []byte    `json:"private_write_key"`
 	PublicWriteKey  []byte    `json:"public_write_key"`
 	Data            []byte    `json:"data"`

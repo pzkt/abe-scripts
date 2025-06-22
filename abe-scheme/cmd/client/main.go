@@ -139,13 +139,20 @@ func (e *env) modifyEntry(table string, entry any, readPurposes string, writePur
 
 	createdTime := time.Now()
 
+	//prevent any part of the record to be tampered with by using all parts to generate the signature
+	var checkSum bytes.Buffer
+	for _, s := range [][]byte{utils.ToBytes(table), newUUID[:], writeKeyCipher, marshaledPublicWriteKey, dataCipher, utils.ToBytes(createdTime)} {
+		checkSum.Write(s)
+	}
+
 	newRecord := utils.Record{
 		Table:           table,
-		ID:              newUUID.String(),
+		ID:              newUUID,
 		PrivateWriteKey: writeKeyCipher,
 		PublicWriteKey:  marshaledPublicWriteKey,
 		Data:            dataCipher,
 		Created:         createdTime,
+		Signature:       crypto.Sign(e.sigKey, checkSum.Bytes()),
 	}
 
 	jsonData := utils.Assure(json.Marshal(newRecord))

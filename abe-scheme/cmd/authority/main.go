@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/gorilla/mux"
 	_ "github.com/lib/pq"
 	"github.com/pzkt/abe-scripts/abe-scheme/internal/crypto"
@@ -50,7 +51,7 @@ func updatePolicyConfig() {
 
 	newRecord := utils.Record{
 		Table:           "relations",
-		ID:              authorityUUID,
+		ID:              utils.Assure(uuid.Parse(authorityUUID)),
 		PrivateWriteKey: []byte{},
 		PublicWriteKey:  []byte{},
 		Data:            utils.ToBytes(newPolicyConfig),

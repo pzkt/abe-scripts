@@ -1,6 +1,9 @@
 package main
 
 import (
+	"bytes"
+	"crypto/ecdsa"
+	"crypto/elliptic"
 	"database/sql"
 	"encoding/json"
 	"fmt"
@@ -9,6 +12,7 @@ import (
 
 	"github.com/gorilla/mux"
 	_ "github.com/lib/pq"
+	"github.com/pzkt/abe-scripts/abe-scheme/internal/crypto"
 	"github.com/pzkt/abe-scripts/abe-scheme/internal/utils"
 )
 
@@ -97,6 +101,46 @@ func addEntry(w http.ResponseWriter, r *http.Request) {
 
 	if exists {
 		fmt.Println("it EXISTS")
+
+		var oldRecord utils.Record
+		getQuery := fmt.Sprintf(`SELECT * FROM %s WHERE id = $1`, record.Table)
+		utils.Try(db.QueryRow(getQuery, record.ID).Scan(&oldRecord.ID, &oldRecord.PrivateWriteKey, &oldRecord.PublicWriteKey, &oldRecord.Data, &oldRecord.Created))
+
+		fmt.Println("test")
+
+		var checkSum bytes.Buffer
+		for _, s := range [][]byte{utils.ToBytes(record.Table), record.ID[:], record.PrivateWriteKey, record.PublicWriteKey, record.Data, utils.ToBytes(record.Created)} {
+			checkSum.Write(s)
+		}
+
+		fmt.Println("test")
+
+		curve := elliptic.P256()
+		unmarshaledX, unmarshaledY := elliptic.Unmarshal(curve, oldRecord.PublicWriteKey)
+		if unmarshaledX == nil {
+			fmt.Println("Error unmarshaling public key: Invalid point")
+			return
+		}
+
+		publicKey := &ecdsa.PublicKey{
+			Curve: curve, // The curve must be the same as the original
+			X:     unmarshaledX,
+			Y:     unmarshaledY,
+		}
+
+		publicKey := ecdsa.New
+
+		fmt.Println("test")
+
+		valid := crypto.Verify(publicKey, checkSum.Bytes(), record.Signature)
+
+		fmt.Println("test")
+		if !valid {
+			fmt.Printf("Signature mismatch: modify request rejected!\n")
+			return
+		}
+		fmt.Printf("Signature verified: modifying entry in table: %s with uuid: %s\n", record.Table, record.ID)
+
 	} else {
 		fmt.Printf("creating new entry in table: %s with uuid: %s\n", record.Table, record.ID)
 	}
@@ -119,35 +163,6 @@ func addEntry(w http.ResponseWriter, r *http.Request) {
 		record.Data,
 		record.Created,
 	))
-}
-
-func modifyEntry(w http.ResponseWriter, r *http.Request) {
-	var record utils.Record
-	if err := json.NewDecoder(r.Body).Decode(&record); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-
-	query := fmt.Sprintf(
-		`INSERT INTO %s (id, private_write_key, public_write_key, data, created) 
-         VALUES ($1, $2, $3, $4, $5) 
-		 ON CONFLICT (id) DO UPDATE SET
-		 private_write_key = EXCLUDED.private_write_key,
-		 public_write_key = EXCLUDED.public_write_key,
-		 data = EXCLUDED.data,
-		 created = EXCLUDED.created`,
-		record.Table,
-	)
-
-	utils.Assure(db.Exec(query,
-		record.ID,
-		record.PrivateWriteKey,
-		record.PublicWriteKey,
-		record.Data,
-		record.Created,
-	))
-
-	fmt.Printf("new entry added in table: %s with uuid: %s\n", record.Table, record.ID)
 }
 
 func getEntry(w http.ResponseWriter, r *http.Request) {
