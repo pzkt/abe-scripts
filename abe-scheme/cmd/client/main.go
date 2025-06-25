@@ -46,30 +46,9 @@ const authorityURL = "http://localhost:8081"
 const authorityUUID = "497dcba3-ecbf-4587-a2dd-5eb0665e6880"
 
 func main() {
-	/* 	key := crypto.GenerateSignatureKey()
-	   	publicKey := key.PublicKey
-
-	   	publicKey.Curve = nil
-	   	byteKey := utils.ToBytes(publicKey)
-
-	   	var newKey ecdsa.PublicKey
-	   	utils.FromBytes(byteKey, &newKey)
-
-	   	data := []byte{45, 213, 43, 6, 43, 3}
-
-	   	signature := crypto.Sign(key, data)
-
-	   	newKey.Curve = elliptic.P256()
-	   	fmt.Println(crypto.Verify(&newKey, data, signature))
-
-	   	return */
-
 	env := setup()
-
 	ABEkey := requestNewKey([]string{"Admin"})
-
 	record := generator.GenerateCardiologyRecord("345")
-
 	addedUUID := env.addEntry("table_one", record, "Profiling OR Marketing", "Admin")
 
 	fmt.Println("first plaintext")
@@ -77,6 +56,7 @@ func main() {
 	fmt.Println(string(env.abeScheme.Decrypt(ciphertext, ABEkey)))
 
 	record.PatientID = "wow schgloopy"
+
 	env.modifyEntry("table_one", record, "Profiling OR Marketing", "Admin", addedUUID)
 
 	fmt.Println("second plaintext")
@@ -92,7 +72,6 @@ func setup() *env {
 		abeScheme: crypto.Setup(),
 		entries:   make(map[uuid.UUID]Entry),
 	}
-
 	newEnv.updatePolicyConfig()
 	return &newEnv
 }
@@ -139,7 +118,6 @@ func (e *env) addEntry(table string, entry any, readPurposes string, writePurpos
 }
 
 func (e *env) modifyEntry(table string, entry any, readPurposes string, writePurposes string, newUUID uuid.UUID) {
-
 	fullReadPurposes := toAttr(readPurposes, e.policyConfig)
 	fullWritePurposes := toAttr(writePurposes, e.policyConfig)
 
@@ -178,6 +156,9 @@ func (e *env) modifyEntry(table string, entry any, readPurposes string, writePur
 	}
 
 	jsonData := utils.Assure(json.Marshal(newRecord))
+
+	//utils.UpdateCSV("new_entries.csv", newUUID.String(), "package size", fmt.Sprint(len(jsonData)))
+
 	resp := utils.Assure(http.Post(databaseURL+"/entries", "application/json", bytes.NewBuffer(jsonData)))
 	defer resp.Body.Close()
 
@@ -217,8 +198,6 @@ func getRow() {
 func (e *env) getWriteKey(table string, recordID string) utils.Record {
 	resp := utils.Assure(http.Get(fmt.Sprintf("%s/write_key/%s/%s", databaseURL, table, recordID)))
 	defer resp.Body.Close()
-
-	fmt.Println(fmt.Sprintf("%s/write_key/%s/%s", databaseURL, table, recordID))
 
 	body := utils.Assure(io.ReadAll(resp.Body))
 

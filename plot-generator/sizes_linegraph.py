@@ -30,7 +30,7 @@ for file in files:
         data.append(selectRow)
     except:
         continue
-plt.figure(figsize=(9, 7))
+plt.figure(figsize=(7, 5))
 
 colors = ['#e41a1c','#377eb8','#4daf4a','#984ea3','#ff7f00']
 
@@ -38,14 +38,14 @@ x_positions = np.arange(len(data[0]))
 reference_line = 2 ** x_positions
 
 # Plot the reference line
-plt.loglog(reference_line, reference_line, 'r--', label=f'plaintext size')
+#plt.loglog(reference_line, reference_line, 'r--', label=f'plaintext size')
 
 for i in range(len(data)):
     if (i in []): #cull certain entries
         continue
     adjusted_values = data[i].values - reference_line
     adjusted_values = np.where(adjusted_values <= 0, 1e-6, adjusted_values)
-    plt.loglog(reference_line, data[i].values, label=files[i] , marker=markers[i], linestyle="-", color=lib_colors[i])
+    plt.plot(reference_line, adjusted_values, label=files[i] , marker=markers[i], linestyle="-", color=lib_colors[i])
 
 ax = plt.gca()
 ax.xaxis.set_major_formatter(ticker.FuncFormatter(human_readable_bytes))
@@ -56,7 +56,7 @@ plt.grid(True, linestyle='--', alpha=0.7)
 
 #plt.title(view)
 plt.xlabel('Plaintext Size')
-plt.ylabel('Ciphertext Size')
+plt.ylabel('Ciphertext Overhead Size')
 
 plt.grid(True)
 

@@ -100,30 +100,21 @@ func addEntry(w http.ResponseWriter, r *http.Request) {
 	utils.Try(db.QueryRow(existQuery, record.ID).Scan(&exists))
 
 	if exists {
-		fmt.Println("it EXISTS")
-
 		var oldRecord utils.Record
 		getQuery := fmt.Sprintf(`SELECT * FROM %s WHERE id = $1`, record.Table)
 		utils.Try(db.QueryRow(getQuery, record.ID).Scan(&oldRecord.ID, &oldRecord.PrivateWriteKey, &oldRecord.PublicWriteKey, &oldRecord.Data, &oldRecord.Created))
-
-		fmt.Println("test")
 
 		var checkSum bytes.Buffer
 		for _, s := range [][]byte{utils.ToBytes(record.Table), record.ID[:], record.PrivateWriteKey, record.PublicWriteKey, record.Data, utils.ToBytes(record.Created)} {
 			checkSum.Write(s)
 		}
 
-		fmt.Println("test")
-
 		var publicKey ecdsa.PublicKey
 		utils.FromBytes(record.PublicWriteKey, &publicKey)
 		publicKey.Curve = elliptic.P256()
 
-		fmt.Println("test")
-
 		valid := crypto.Verify(&publicKey, checkSum.Bytes(), record.Signature)
 
-		fmt.Println("test")
 		if !valid {
 			fmt.Printf("Signature mismatch: modify request rejected!\n")
 			return

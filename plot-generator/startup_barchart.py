@@ -16,22 +16,17 @@ color_map = {
     'rabe ghw11': '#4ecb8d'
 }
 
-# Read and sort data
 df = pd.read_csv('data.csv', header=None, names=['Name', 'Value'])
 df_sorted = df.sort_values('Value', ascending=False)
 
-# Create list of colors in the sorted order
-colors = [color_map.get(name, '#888888') for name in df_sorted['Name']]  # Default gray for unmapped categories
+colors = [color_map.get(name, '#888888') for name in df_sorted['Name']]
 
-# Create bar chart with custom colors
 plt.figure(figsize=(10, 6))
 bars = plt.bar(df_sorted['Name'], df_sorted['Value'], color=colors)
 
-# Customize chart
 plt.ylabel('Time [ms]')
 plt.xticks(rotation=45, ha='right')
 
-# Add value labels
 for bar in bars:
     height = bar.get_height()
     plt.text(bar.get_x() + bar.get_width()/2., height,

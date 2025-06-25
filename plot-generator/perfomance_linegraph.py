@@ -2,7 +2,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import random
 
-path = "../scheme-benchmarking/Results/"
+path = "../scheme-benchmarking/Results/performance/"
 files = ["charm_bsw07","charm_fame","charm_rw15","charm_waters11","charm_yahk14","circl_tkn20","gofe_fame","openabe_waters11","rabe_bsw07","rabe_fame","rabe_ghw11"]
 markers = ["o","s","D","P","^","o","o","o","o","s","D"];
 lib_colors = ["#003a7d"] * 5 + ["#008dff", "#d83034" , "#c701ff"] + ["#4ecb8d"] * 3

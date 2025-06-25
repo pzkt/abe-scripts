@@ -19,5 +19,10 @@ func (p Config) ResolvePurpose(purpose string) []string {
 		}
 		out = append(out, node.GetRootPath()...)
 	}
-	return out
+
+	if len(out) == 0 {
+		return []string{purpose}
+	} else {
+		return out
+	}
 }

@@ -7,6 +7,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -18,11 +19,13 @@ import (
 )
 
 var scheme *crypto.ABEscheme
+var setup_time int64
 
 const databaseURL = "http://localhost:8080"
 const authorityUUID = "497dcba3-ecbf-4587-a2dd-5eb0665e6880"
 
 func main() {
+	setup_time = time.Now().Unix()
 
 	scheme = crypto.Setup()
 	updatePolicyConfig()
@@ -42,20 +45,53 @@ func getKey(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(scheme.KeyGen(attributes))
 }
 
+func getTimestampedKey(w http.ResponseWriter, r *http.Request) {
+	attributes := r.URL.Query()["attribute"]
+	fmt.Printf("generating timestamped key for attributes %v\n", attributes)
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(scheme.KeyGen(append(attributes, generateTimestamp()...)))
+}
+
 func updatePolicyConfig() {
+
+	writeKey := crypto.GenerateSignatureKey()
 
 	newPolicyConfig := policyConfig.Config{
 		PurposeTrees: utils.ExamplePurposeTrees(),
 		Scheme:       crypto.ABEscheme{PublicKey: scheme.PublicKey},
 	}
 
+	createdTime := time.Now()
+	uuid := utils.Assure(uuid.Parse(authorityUUID))
+
+	publicKey := writeKey.PublicKey
+
+	//curve is an interface type and can't be marshaled, we remove it and the database can add it back
+	publicKey.Curve = nil
+	marshaledPublicWriteKey := utils.ToBytes(publicKey)
+
+	var checkSum bytes.Buffer
+
+	// needed for MessagePack encoding
+	/* 	for _, c := range newPolicyConfig.PurposeTrees {
+		c.DisconnectParents()
+	} */
+
+	for _, s := range [][]byte{utils.ToBytes("relations"), uuid[:], []byte{}, marshaledPublicWriteKey, utils.ToBytes(newPolicyConfig), utils.ToBytes(createdTime)} {
+		checkSum.Write(s)
+	}
+
+	signature := crypto.Sign(writeKey, checkSum.Bytes())
+
 	newRecord := utils.Record{
 		Table:           "relations",
-		ID:              utils.Assure(uuid.Parse(authorityUUID)),
+		ID:              uuid,
 		PrivateWriteKey: []byte{},
-		PublicWriteKey:  []byte{},
+		PublicWriteKey:  marshaledPublicWriteKey,
 		Data:            utils.ToBytes(newPolicyConfig),
-		Created:         time.Now(),
+		Created:         createdTime,
+		Signature:       signature,
 	}
 
 	jsonData := utils.Assure(json.Marshal(newRecord))
@@ -67,4 +103,17 @@ func updatePolicyConfig() {
 	if resp.StatusCode != http.StatusOK {
 		log.Fatalf("entry add failed: %s", body)
 	}
+}
+
+func generateTimestamp() []string {
+	valueSize := 15
+	value := time.Now().Unix()
+
+	out := []string{}
+	for i := valueSize - 1; i >= 0; i-- {
+		// Shift and mask to get each bit
+		bit := (value >> i) & 1
+		out = append(out, strings.Repeat("*", valueSize-i-1)+fmt.Sprintf("%d", bit)+strings.Repeat("*", i))
+	}
+	return out
 }

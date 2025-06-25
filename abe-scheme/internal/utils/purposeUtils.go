@@ -41,6 +41,13 @@ func (t *Tree) ReconnectParents(p *Tree) {
 	}
 }
 
+func (t *Tree) DisconnectParents() {
+	t.Parent = nil
+	for _, c := range t.Children {
+		c.DisconnectParents()
+	}
+}
+
 func (t *Tree) AddChild(value string) *Tree {
 	child := new(Tree)
 	t.Children = append(t.Children, child)
