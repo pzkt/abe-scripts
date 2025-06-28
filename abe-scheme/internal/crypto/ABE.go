@@ -1,3 +1,11 @@
+/*
+
+This file contains all relevant functions for ABE encryption
+If the ABE scheme were to be replaced (by an ABE scheme with similar functions)
+then only this file would have to be modified
+
+*/
+
 package crypto
 
 import (

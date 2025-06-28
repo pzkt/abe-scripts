@@ -1,3 +1,9 @@
+/*
+
+config struct isolated to avoid circular dependencies
+
+*/
+
 package policyConfig
 
 import (

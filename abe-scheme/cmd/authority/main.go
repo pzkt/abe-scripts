@@ -1,3 +1,10 @@
+/*
+
+The authority is responsible for setting up the ABE scheme and generating private keys
+They must also update the policy config
+
+*/
+
 package main
 
 import (
@@ -32,11 +39,13 @@ func main() {
 
 	r := mux.NewRouter()
 	r.HandleFunc("/get_key", getKey).Methods("GET")
+	r.HandleFunc("/get_time_key", getTimestampedKey).Methods("GET")
 
 	log.Println("key authority server started on port :8081")
 	log.Fatal(http.ListenAndServe(":8081", r))
 }
 
+// request a key from the key authority. We do not go over verification or authentication of key requests for demonstration purposes
 func getKey(w http.ResponseWriter, r *http.Request) {
 	attributes := r.URL.Query()["attribute"]
 	fmt.Printf("generating key for attributes %v\n", attributes)
@@ -45,6 +54,7 @@ func getKey(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(scheme.KeyGen(attributes))
 }
 
+// request a key from the key authority that contains timestamp attributes
 func getTimestampedKey(w http.ResponseWriter, r *http.Request) {
 	attributes := r.URL.Query()["attribute"]
 	fmt.Printf("generating timestamped key for attributes %v\n", attributes)
@@ -53,6 +63,7 @@ func getTimestampedKey(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(scheme.KeyGen(append(attributes, generateTimestamp()...)))
 }
 
+// uptate the policy config entry in the database
 func updatePolicyConfig() {
 
 	writeKey := crypto.GenerateSignatureKey()
@@ -105,6 +116,7 @@ func updatePolicyConfig() {
 	}
 }
 
+// turn the current date to an array of attributes that represent the current timestamp
 func generateTimestamp() []string {
 	valueSize := 15
 	value := time.Now().Unix()

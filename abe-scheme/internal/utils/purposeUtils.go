@@ -1,3 +1,9 @@
+/*
+
+functions for the purpose hierarchy tree struct
+
+*/
+
 package utils
 
 import "strings"

@@ -1,3 +1,9 @@
+/*
+
+A simple lexer and parser for turning purpose policies, out of AND and OR gates to attribute policies
+
+*/
+
 package main
 
 import (
@@ -419,6 +425,7 @@ func resolvePurposeArray(purposes []string) *Node {
 	return root
 }
 
+// use the purpose hierarchy to turn a purpose policy into attribute policies
 func toAttr(purposes string, policyConfig policyConfig.Config) string {
 	parser := NewParser(purposes, policyConfig)
 	ast := parser.Parse()

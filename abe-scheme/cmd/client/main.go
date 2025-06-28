@@ -1,3 +1,11 @@
+/*
+
+The client represents both data owner and user.
+The plaintext should only be visible here by the data owner before encrypting
+and by the user after decrypting
+
+*/
+
 package main
 
 import (
@@ -62,9 +70,6 @@ func main() {
 	fmt.Println("second plaintext")
 	ciphertext = env.getEntry("table_one", addedUUID).Data
 	fmt.Println(string(env.abeScheme.Decrypt(ciphertext, ABEkey)))
-
-	//fmt.Println(generateBitAttributes(174897, 18))
-	//out, _ := generateComparison(8, 4, Greater)
 }
 
 func setup() *env {
@@ -76,6 +81,7 @@ func setup() *env {
 	return &newEnv
 }
 
+// update the local policy
 func (e *env) updatePolicyConfig() {
 	data := e.getEntry("relations", utils.Assure(uuid.Parse(authorityUUID))).Data
 	utils.FromBytes(data, &e.policyConfig)
@@ -191,10 +197,6 @@ func (e *env) getEntry(table string, recordID uuid.UUID) utils.Record {
 	return record
 }
 
-func getRow() {
-
-}
-
 func (e *env) getWriteKey(table string, recordID string) utils.Record {
 	resp := utils.Assure(http.Get(fmt.Sprintf("%s/write_key/%s/%s", databaseURL, table, recordID)))
 	defer resp.Body.Close()
@@ -220,6 +222,7 @@ func generateBitAttributes(value uint, valueSize int) []string {
 	return out
 }
 
+// generate the policy for a given comparison operator and given value
 func generateComparison(value int, valueSize int, op Ops) (string, error) {
 	switch op {
 	case GreaterOrEqual:

@@ -1,3 +1,10 @@
+/*
+
+The database is the only application that should have access to the postgreSQL database.
+They must validate incoming modification requests
+
+*/
+
 package main
 
 import (
@@ -88,6 +95,7 @@ func setup(db *sql.DB) {
 	utils.Assure(db.Exec(query))
 }
 
+// add entry or validate if the given UUID already exists
 func addEntry(w http.ResponseWriter, r *http.Request) {
 	var record utils.Record
 	if err := json.NewDecoder(r.Body).Decode(&record); err != nil {
@@ -145,6 +153,7 @@ func addEntry(w http.ResponseWriter, r *http.Request) {
 	))
 }
 
+// return the data field of an entry
 func getEntry(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	table := vars["table"]
@@ -167,6 +176,7 @@ func getEntry(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(record)
 }
 
+// return the private write key field of an entry
 func getWriteKey(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	table := vars["table"]

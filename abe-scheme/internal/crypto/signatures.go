@@ -1,3 +1,9 @@
+/*
+
+Functions for signing
+
+*/
+
 package crypto
 
 import (
@@ -10,12 +16,6 @@ import (
 
 	"github.com/pzkt/abe-scripts/abe-scheme/internal/utils"
 )
-
-/* func generateSymKey() []byte {
-	key := make([]byte, 32) // AES-256
-	utils.Assure(rand.Read(key))
-	return key
-} */
 
 func GenerateSignatureKey() *ecdsa.PrivateKey {
 	return utils.Assure(ecdsa.GenerateKey(elliptic.P256(), rand.Reader))
